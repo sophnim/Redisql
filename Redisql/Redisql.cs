@@ -10,12 +10,23 @@ using StackExchange.Redis;
 
 namespace Redisql
 {
+    public class FieldSetting
+    {
+        Int32 fieldIndex;
+        Type fieldType;
+        bool fieldIndexFlag;
+        bool fieldPrimaryKeyFlag;
+    }
 
+    public class TableSetting
+    {
+        int tableID;
+        Dictionary<string, FieldSetting> tableSchemaDic = new Dictionary<string, FieldSetting>();
+    }
 
     public class Redisql
     {
-        
-
+        ConcurrentDictionary<string, TableSetting> tableSettingDic = new ConcurrentDictionary<string, TableSetting>();
         ConnectionMultiplexer redis;
 
         public Redisql(string redisIp, Int32 redisPort, string redisPassword)
@@ -83,6 +94,11 @@ namespace Redisql
             var db = this.redis.GetDatabase();
             var key = GetTableLockRedisKey(tableName, primaryKeyValue);
             db.KeyDeleteAsync(key, CommandFlags.FireAndForget);
+        }
+
+        private void GetTableIdAndSchema(string tableName)
+        {
+
         }
 
         // List<Tuple<string,Type,bool>> fieldList : fieldName, fieldType, IndexFlag
