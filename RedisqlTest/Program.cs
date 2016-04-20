@@ -22,9 +22,7 @@ namespace RedisqlTest
             fieldList.Add(new Tuple<string, Type, bool>("exp", typeof(Int32), false));
 
             redisql.CreateTable("Account_Table", "name", fieldList).Wait();
-
-            //var valueDic = new Dictionary<string, string>();
-
+            
             List<Task> tasklist = new List<Task>();
             var stw = Stopwatch.StartNew();
             int testCount = 280000;
@@ -42,6 +40,12 @@ namespace RedisqlTest
             Console.WriteLine("Total {0}ms  {1} per 1ms", stw.ElapsedMilliseconds, testCount / stw.ElapsedMilliseconds);
 
             /*
+            var valueDic = new Dictionary<string, string>();
+            valueDic.Add("name", "bruce");
+            valueDic.Add("level", "1");
+            valueDic.Add("exp", "100");
+            redisql.InsertTableRow("Account_Table", valueDic).Wait();
+
             valueDic.Clear();
             valueDic.Add("name", "jane");
             valueDic.Add("level", "1");
@@ -68,6 +72,7 @@ namespace RedisqlTest
 
             redisql.DeleteTableRow("Account_Table", "jane").Wait();
             */
+
             Console.ReadLine();
         }
     }

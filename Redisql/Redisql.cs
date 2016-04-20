@@ -12,16 +12,17 @@ namespace Redisql
 {
     public class FieldSetting
     {
-        Int32 fieldIndex;
-        Type fieldType;
-        bool fieldIndexFlag;
-        bool fieldPrimaryKeyFlag;
+        public Int32 fieldIndex;
+        public string fieldType;
+        public bool fieldIndexFlag;
     }
 
     public class TableSetting
     {
-        int tableID;
-        Dictionary<string, FieldSetting> tableSchemaDic = new Dictionary<string, FieldSetting>();
+        public int tableID;
+        public string primaryKeyFieldName;
+        public Dictionary<string, FieldSetting> tableSchemaDic = new Dictionary<string, FieldSetting>();
+        public Dictionary<string, Int32> indexedFieldDic = new Dictionary<string, int>();
     }
 
     public class Redisql
@@ -50,12 +51,12 @@ namespace Redisql
             return string.Format("HA:TSM:{0}", tableName);
         }
 
-        private string GetTableFieldIndexRedisKey(string tableID, string fieldIndex, string value)
+        private string GetTableFieldIndexRedisKey(Int32 tableID, Int32 fieldIndex, string value)
         {
             return string.Format("SE:TFX:{0}:{1}:{2}", tableID, fieldIndex, value);
         }
 
-        private string GetTableRowRedisKey(string tableID, string primaryKeyValue)
+        private string GetTableRowRedisKey(Int32 tableID, string primaryKeyValue)
         {
             return string.Format("HA:TRW:{0}:{1}", tableID, primaryKeyValue);
         }
@@ -96,9 +97,59 @@ namespace Redisql
             db.KeyDeleteAsync(key, CommandFlags.FireAndForget);
         }
 
-        private void GetTableIdAndSchema(string tableName)
+        private async Task<TableSetting> GetTableSetting(string tableName)
         {
+            TableSetting ts;
+            var db = this.redis.GetDatabase();
 
+            if (!this.tableSettingDic.TryGetValue(tableName, out ts))
+            {
+                // 아직 로드되지 않았다. redis로부터 읽어들인다.
+                ts = new TableSetting();
+
+                // get table id
+                var tableID = await db.HashGetAsync(Consts.RedisKey_Hash_TableNameIds, tableName);
+                if (RedisValue.Null == tableID)
+                {
+                    return null;
+                }
+
+                ts.tableID = Convert.ToInt32(tableID);
+
+                // read table schema
+                var tableSchema = await db.HashGetAllAsync(GetTableSchemaRedisKey(tableName));
+                if (null == tableSchema)
+                {
+                    return null;
+                }
+
+                // get table info
+                foreach (var e in tableSchema)
+                {
+                    var tokens = e.Value.ToString().Split(',');
+
+                    var fs = new FieldSetting();
+                    fs.fieldIndex = Convert.ToInt32(tokens[0]);
+                    fs.fieldType = tokens[1];
+                    fs.fieldIndexFlag = Convert.ToBoolean(tokens[2]);
+                    if (fs.fieldIndexFlag)
+                    {
+                        ts.indexedFieldDic.Add(e.Name, fs.fieldIndex);
+                    }
+
+                    var fieldPrimaryKeyFlag = Convert.ToBoolean(tokens[3]);
+                    if (fieldPrimaryKeyFlag)
+                    {
+                        ts.primaryKeyFieldName = e.Name;
+                    }
+
+                    ts.tableSchemaDic.Add(e.Name, fs);
+                }
+
+                this.tableSettingDic.TryAdd(tableName, ts);
+            }
+
+            return ts;
         }
 
         // List<Tuple<string,Type,bool>> fieldList : fieldName, fieldType, IndexFlag
@@ -137,7 +188,7 @@ namespace Redisql
                         indexFlag = false;
                     }
 
-                    var value = string.Format("{0},{1},{2},{3}", fieldIndex++, t.Item2.ToString(), Convert.ToInt32(indexFlag), Convert.ToInt32(pkFlag)); // fieldIndex, Type, IndexFlag, primaryKeyFlag
+                    var value = string.Format("{0},{1},{2},{3}", fieldIndex++, t.Item2.ToString(), indexFlag.ToString(), pkFlag.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag
                     await db.HashSetAsync(tableSchemaName, t.Item1, value);
                 }
 
@@ -162,41 +213,14 @@ namespace Redisql
             {
                 var db = this.redis.GetDatabase();
 
-                // get table id
-                var tableID = await db.HashGetAsync(Consts.RedisKey_Hash_TableNameIds, tableName);
-                if (RedisValue.Null == tableID)
+                var ts = await GetTableSetting(tableName);
+                if (null == ts)
                 {
                     return false;
-                }
-
-                // read table schema
-                var tableSchemaName = GetTableSchemaRedisKey(tableName); //string.Format("HA:TSM:{0}", tableName);
-                var tableSchema = await db.HashGetAllAsync(tableSchemaName);
-                if (null == tableSchema)
-                {
-                    return false;
-                }
-
-                // get table info
-                string tablePrimaryKeyFieldName = null;
-                var tableSchemaDic = new Dictionary<string, Tuple<string, string, string, string>>();
-                foreach (var e in tableSchema)
-                {
-                    var tokens = e.Value.ToString().Split(',');
-                    var fieldIndex = tokens[0];
-                    var fieldType = tokens[1];
-                    var fieldIndexFlag = tokens[2];
-                    var fieldPrimaryKeyFlag = tokens[3];
-                    if (fieldPrimaryKeyFlag.Equals("1"))
-                    {
-                        tablePrimaryKeyFieldName = e.Name;
-                    }
-
-                    tableSchemaDic.Add(e.Name, new Tuple<string, string, string, string>(fieldIndex, fieldType, fieldIndexFlag, fieldPrimaryKeyFlag));
                 }
 
                 // get primaryKey value of insert row
-                if (!fieldValues.TryGetValue(tablePrimaryKeyFieldName, out primaryKeyValue))
+                if (!fieldValues.TryGetValue(ts.primaryKeyFieldName, out primaryKeyValue))
                     return false;
 
                 enterLock = true;
@@ -206,37 +230,36 @@ namespace Redisql
                 int arrayIndex = 0;
                 List<Task> tasklist = new List<Task>();
                 HashEntry[] heArray = new HashEntry[fieldValues.Count];
-                foreach (var e in tableSchemaDic)
+                foreach (var e in ts.tableSchemaDic)
                 {
                     string value;
                     if (fieldValues.TryGetValue(e.Key, out value))
                     {
-                        var fieldIndex = e.Value.Item1;
-                        var fieldType = e.Value.Item2;
-                        var fieldIndexFlag = e.Value.Item3;
-                        var fieldPrimaryKeyFlag = e.Value.Item4;
-
+                        var fieldIndex = e.Value.fieldIndex;
+                        var fieldType = e.Value.fieldType;
+                        var fieldIndexFlag = e.Value.fieldIndexFlag;
                         heArray[arrayIndex++] = new HashEntry(fieldIndex, value);
 
-                        if (fieldIndexFlag.Equals("1"))
+                        if (fieldIndexFlag)
                         {
                             // make index
-                            key = GetTableFieldIndexRedisKey(tableID, fieldIndex, value); //string.Format("SE:TIX:{0}:{1}:{2}", tableID, fieldIndex, value);
+                            key = GetTableFieldIndexRedisKey(ts.tableID, fieldIndex, value); 
                             tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
                         }
                     }
                     else
                     {
+                        // apply default value?
                         return false;
                     }
                 }
 
                 // save table row
-                key = GetTableRowRedisKey(tableID, primaryKeyValue); //string.Format("HA:TIM:{0}:{1}", tableID, primaryKeyValue);
+                key = GetTableRowRedisKey(ts.tableID, primaryKeyValue); 
                 tasklist.Add(db.HashSetAsync(key, heArray));
 
                 // save table primary key 
-                key = GetTablePrimaryKeyListRedisKey(tableName); //string.Format("SE:TPK:{0}", tableName);
+                key = GetTablePrimaryKeyListRedisKey(tableName); 
                 tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
 
                 foreach (var task in tasklist)
@@ -269,48 +292,14 @@ namespace Redisql
                 var db = this.redis.GetDatabase();
                 List<Task> tasklist = new List<Task>();
 
-                // get table id
-                var tableID = await db.HashGetAsync(Consts.RedisKey_Hash_TableNameIds, tableName);
-                if (RedisValue.Null == tableID)
+                var ts = await GetTableSetting(tableName);
+                if (null == ts)
                 {
                     return false;
-                }
-
-                // read table schema
-                var tableSchemaName = GetTableSchemaRedisKey(tableName); //string.Format("HA:TSM:{0}", tableName);
-                var tableSchema = await db.HashGetAllAsync(tableSchemaName);
-                if (null == tableSchema)
-                {
-                    return false;
-                }
-
-                // get table info
-                var indexedFieldSet = new HashSet<Tuple<string, string>>(); // fieldName, fieldIndex
-                string tablePrimaryKeyFieldName = null;
-                var tableSchemaDic = new Dictionary<string, Tuple<string, string, string, string>>();
-                foreach (var e in tableSchema)
-                {
-                    var tokens = e.Value.ToString().Split(',');
-                    var fieldIndex = tokens[0];
-                    var fieldType = tokens[1];
-                    var fieldIndexFlag = tokens[2];
-                    var fieldPrimaryKeyFlag = tokens[3];
-
-                    if (fieldIndexFlag.Equals("1"))
-                    {
-                        indexedFieldSet.Add(new Tuple<string, string>(e.Name, fieldIndex));
-                    }
-
-                    if (fieldPrimaryKeyFlag.Equals("1"))
-                    {
-                        tablePrimaryKeyFieldName = e.Name;
-                    }
-
-                    tableSchemaDic.Add(e.Name, new Tuple<string, string, string, string>(fieldIndex, fieldType, fieldIndexFlag, fieldPrimaryKeyFlag));
                 }
 
                 // 업데이트하려는 row의 primaryKey value를 얻는다.
-                if (!updateFieldValues.TryGetValue(tablePrimaryKeyFieldName, out primaryKeyValue))
+                if (!updateFieldValues.TryGetValue(ts.primaryKeyFieldName, out primaryKeyValue))
                 {
                     // 업데이트하려는 값 정보에 PrimaryKey value가 없다. 
                     return false;
@@ -318,15 +307,15 @@ namespace Redisql
 
                 // 업데이트 하려는 row의 값중 인덱스에 해당하는 값을 찾는다. 이 값들은 읽어서 갱신해야 한다.
 
-                var updatedIndexFields = new HashSet<Tuple<string, string, string>>(); // fieldName, fieldIndex, updatedValue
+                var updatedIndexFields = new HashSet<Tuple<string, Int32, string>>(); // fieldName, fieldIndex, updatedValue
                                                                                        // 이미 저장되어 있는 값중 인덱스값을 읽는다.
-                foreach (var tpl in indexedFieldSet)
+                foreach (var e in ts.indexedFieldDic)
                 {
                     string value;
-                    if (updateFieldValues.TryGetValue(tpl.Item1, out value))
+                    if (updateFieldValues.TryGetValue(e.Key, out value))
                     {
                         // update 하려는 값중에 인덱스가 걸려있는 값이 있다. 인덱스를 갱신해야 한다.
-                        updatedIndexFields.Add(new Tuple<string, string, string>(tpl.Item1, tpl.Item2, value));
+                        updatedIndexFields.Add(new Tuple<string, Int32, string>(e.Key, e.Value, value));
                     }
                 }
 
@@ -345,17 +334,17 @@ namespace Redisql
                         rvArray[index++] = tpl.Item2;
                     }
 
-                    key = GetTableRowRedisKey(tableID, primaryKeyValue); //string.Format("HA:TIM:{0}:{1}", tableID, primaryKeyValue);
+                    key = GetTableRowRedisKey(ts.tableID, primaryKeyValue); 
                     var ret = await db.HashGetAsync(key, rvArray);
 
                     // 원래 값으로 저장되어 있던 인덱스를 지우고 새 값으로 갱신
                     index = 0;
                     foreach (var tpl in updatedIndexFields)
                     {
-                        key = GetTableFieldIndexRedisKey(tableID, tpl.Item2, ret[index].ToString()); //string.Format("SE:TIX:{0}:{1}:{2}", tableID, tpl.Item2, ret[index].ToString());
+                        key = GetTableFieldIndexRedisKey(ts.tableID, tpl.Item2, ret[index].ToString()); 
                         tasklist.Add(db.SetRemoveAsync(key, primaryKeyValue));
 
-                        key = GetTableFieldIndexRedisKey(tableID, tpl.Item2, tpl.Item3); //string.Format("SE:TIX:{0}:{1}:{2}", tableID, tpl.Item2, tpl.Item3);
+                        key = GetTableFieldIndexRedisKey(ts.tableID, tpl.Item2, tpl.Item3); 
                         tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
 
                         index++;
@@ -366,15 +355,15 @@ namespace Redisql
                 HashEntry[] heArray = new HashEntry[updateFieldValues.Count];
                 foreach (var e in updateFieldValues)
                 {
-                    Tuple<string, string, string, string> tpl;
-                    if (tableSchemaDic.TryGetValue(e.Key, out tpl))
+                    FieldSetting fs;
+                    if (ts.tableSchemaDic.TryGetValue(e.Key, out fs))
                     {
-                        heArray[arrayIndex++] = new HashEntry(tpl.Item1, e.Value);
+                        heArray[arrayIndex++] = new HashEntry(fs.fieldIndex, e.Value);
                     }
                 }
 
                 // save table row
-                key = GetTableRowRedisKey(tableID, primaryKeyValue); //string.Format("HA:TIM:{0}:{1}", tableID, primaryKeyValue);
+                key = GetTableRowRedisKey(ts.tableID, primaryKeyValue); 
                 tasklist.Add(db.HashSetAsync(key, heArray));
 
                 foreach (var task in tasklist)
@@ -406,48 +395,14 @@ namespace Redisql
                 var db = this.redis.GetDatabase();
                 List<Task> tasklist = new List<Task>();
 
-                // get table id
-                var tableID = await db.HashGetAsync(Consts.RedisKey_Hash_TableNameIds, tableName);
-                if (RedisValue.Null == tableID)
+                var ts = await GetTableSetting(tableName);
+                if (null == ts)
                 {
                     return false;
-                }
-
-                // read table schema
-                var tableSchemaName = GetTableSchemaRedisKey(tableName); //string.Format("HA:TSM:{0}", tableName);
-                var tableSchema = await db.HashGetAllAsync(tableSchemaName);
-                if (null == tableSchema)
-                {
-                    return false;
-                }
-
-                // get table info
-                var indexedFieldSet = new HashSet<Tuple<string, string>>(); // fieldName, fieldIndex
-                string tablePrimaryKeyFieldName = null;
-                var tableSchemaDic = new Dictionary<string, Tuple<string, string, string, string>>();
-                foreach (var e in tableSchema)
-                {
-                    var tokens = e.Value.ToString().Split(',');
-                    var fieldIndex = tokens[0];
-                    var fieldType = tokens[1];
-                    var fieldIndexFlag = tokens[2];
-                    var fieldPrimaryKeyFlag = tokens[3];
-
-                    if (fieldIndexFlag.Equals("1"))
-                    {
-                        indexedFieldSet.Add(new Tuple<string, string>(e.Name, fieldIndex));
-                    }
-
-                    if (fieldPrimaryKeyFlag.Equals("1"))
-                    {
-                        tablePrimaryKeyFieldName = e.Name;
-                    }
-
-                    tableSchemaDic.Add(e.Name, new Tuple<string, string, string, string>(fieldIndex, fieldType, fieldIndexFlag, fieldPrimaryKeyFlag));
                 }
 
                 // 지우기 전에 전체값을 읽는다. 인덱스를 지우기 위함이다.
-                var key = GetTableRowRedisKey(tableID, primaryKeyValue); //string.Format("HA:TIM:{0}:{1}", tableID, primaryKeyValue);
+                var key = GetTableRowRedisKey(ts.tableID, primaryKeyValue); 
                 var ret = await db.HashGetAllAsync(key);
                 if (null == ret)
                 {
@@ -455,19 +410,18 @@ namespace Redisql
                 }
 
                 // 인덱스 삭제
-                foreach (var tpl in indexedFieldSet)
+                foreach (var fieldIndex in ts.indexedFieldDic.Values)
                 {
-                    var fieldIndex = tpl.Item2;
-                    key = GetTableFieldIndexRedisKey(tableID, fieldIndex, ret[Convert.ToInt32(fieldIndex)].Value); //string.Format("SE:TIX:{0}:{1}:{2}", tableID, fieldIndex, ret[Convert.ToInt32(fieldIndex)].Value);
+                    key = GetTableFieldIndexRedisKey(ts.tableID, fieldIndex, ret[Convert.ToInt32(fieldIndex)].Value); 
                     tasklist.Add(db.SetRemoveAsync(key, primaryKeyValue));
                 }
 
                 // 테이블 로우 아이템 삭제
-                key = GetTableRowRedisKey(tableID, primaryKeyValue); //string.Format("HA:TIM:{0}:{1}", tableID, primaryKeyValue);
+                key = GetTableRowRedisKey(ts.tableID, primaryKeyValue); 
                 tasklist.Add(db.KeyDeleteAsync(key));
 
                 // remove table primary key 
-                key = GetTablePrimaryKeyListRedisKey(tableName);  //string.Format("SE:TPK:{0}", tableName);
+                key = GetTablePrimaryKeyListRedisKey(tableName);  
                 tasklist.Add(db.SetRemoveAsync(key, primaryKeyValue));
 
                 foreach (var task in tasklist)
