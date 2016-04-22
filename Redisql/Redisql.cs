@@ -552,23 +552,57 @@ namespace Redisql
         }
 
         // primaryKeyValue하고 일치하는 테이블 row 1개를 선택한다.
-        public async Task<Dictionary<string, string>> SelectTableRowByPrimaryKey(string tableName, string primaryKeyValue)
+        // selectFields : 선택할 field name list. 만약 null이면 모든 field를 선택한다.
+        public async Task<Dictionary<string, string>> SelectTableRowByPrimaryKey(List<string> selectFields, string tableName, string primaryKeyValue)
         {
             var retdic = new Dictionary<string, string>();
             var ts = await GetTableSetting(tableName);
             var key = GetTableRowRedisKey(ts.tableID, primaryKeyValue);
-
             var db = this.redis.GetDatabase();
-            var ret = await db.HashGetAllAsync(key);
-            if (null == ret)
-                return retdic;
 
-            foreach (var e in ret)
+            if (null == selectFields)
             {
-                string tableFieldName;
-                if (ts.fieldIndexNameDic.TryGetValue(e.Name, out tableFieldName))
+                // selectFields가 null이면 모든 필드를 읽는다.
+                var ret = await db.HashGetAllAsync(key);
+                if (null != ret)
                 {
-                    retdic.Add(tableFieldName, e.Value.ToString());
+                    var len = ret.Length;
+                    for (var i = 0; i < len; i++)
+                    {
+                        var e = ret[i];
+                        string tableFieldName;
+                        if (ts.fieldIndexNameDic.TryGetValue(e.Name, out tableFieldName))
+                        {
+                            retdic.Add(tableFieldName, e.Value.ToString());
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // selectFields가 존재하면 해당 필드만 읽는다.
+                var len = selectFields.Count;
+                RedisValue[] rv = new RedisValue[len];
+                for (var i = 0; i < len; i++)
+                {
+                    FieldSetting fs;
+                    if (ts.tableSchemaDic.TryGetValue(selectFields[i], out fs))
+                    {
+                        rv[i] = fs.fieldIndex.ToString();
+                    }
+                    else
+                    {
+                        // 존재하지 않는 field
+                        
+                    }
+                }
+                var ret = await db.HashGetAsync(key, rv);
+                if (null != ret)
+                {
+                    for (var i = 0; i < len; i++)
+                    {
+                        retdic.Add(selectFields[i], ret[i].ToString());
+                    }
                 }
             }
 
@@ -576,7 +610,7 @@ namespace Redisql
         }
 
         // 인덱스된 필드에 값이 일치하는 모든 테이블 row를 선택한다.
-        public async Task<List<Dictionary<string,string>>> SelectTableRowByIndexedField(string tableName, string fieldName, string value)
+        public async Task<List<Dictionary<string,string>>> SelectTableRowByIndexedField(List<string> selectFields, string tableName, string fieldName, string value)
         {
             var retlist = new List<Dictionary<string, string>>();
             var ts = await GetTableSetting(tableName);
@@ -614,6 +648,51 @@ namespace Redisql
             }
 
             return retlist;
+        }
+
+        // sort된 field값이 lowValue와 highValue 사이에 있는 모든 row를 구한다.
+        public async Task<List<Dictionary<string, string>>> SelectTableRowBySortedFieldRange(string tableName, string fieldName, string lowValue, string highValue)
+        {
+            var retlist = new List<Dictionary<string, string>>();
+            var ts = await GetTableSetting(tableName);
+            var db = this.redis.GetDatabase();
+
+            FieldSetting fs;
+            if (!ts.tableSchemaDic.TryGetValue(fieldName, out fs))
+            {
+                return retlist;
+            }
+
+            var lv = ConvertToScore(fs.fieldType, lowValue);
+            var hv = ConvertToScore(fs.fieldType, highValue);
+
+            var key = GetTableFieldSortedSetIndexRedisKey(ts.tableID, fs.fieldIndex);
+            var ret = await db.SortedSetRangeByScoreAsync(key, lv, hv);
+
+            List<Task<HashEntry[]>> tasklist = new List<Task<HashEntry[]>>();
+            foreach (var primaryKeyValue in ret)
+            {
+                key = GetTableRowRedisKey(ts.tableID, primaryKeyValue);
+                tasklist.Add(db.HashGetAllAsync(key));
+            }
+
+            foreach (var task in tasklist)
+            {
+                await task;
+                var heArray = task.Result;
+                var dic = new Dictionary<string, string>();
+                foreach (var he in heArray)
+                {
+                    string tableFieldName;
+                    if (ts.fieldIndexNameDic.TryGetValue(he.Name, out tableFieldName))
+                    {
+                        dic.Add(tableFieldName, he.Value);
+                    }
+                }
+                retlist.Add(dic);
+            }
+
+            return retlist; 
         }
     }
         
