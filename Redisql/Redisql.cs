@@ -16,6 +16,7 @@ namespace Redisql
         public Type fieldType;
         public bool fieldIndexFlag;
         public bool fieldSortFlag;
+        public object fieldDefaultValue;
     }
 
     public class TableSetting
@@ -51,32 +52,32 @@ namespace Redisql
 
         private string GetTableSchemaRedisKey(string tableName)
         {
-            return string.Format("HA:TSM:{0}", tableName);
+            return string.Format("C:{0}", tableName);
         }
 
         private string GetTableFieldIndexRedisKey(Int32 tableID, Int32 fieldIndex, string value)
         {
-            return string.Format("SE:TFX:{0}:{1}:{2}", tableID.ToString(), fieldIndex.ToString(), value);
+            return string.Format("I:{0}:{1}:{2}", tableID.ToString(), fieldIndex.ToString(), value);
         }
 
         private string GetTableFieldSortedSetIndexRedisKey(Int32 tableID, Int32 fieldIndex)
         {
-            return string.Format("SO:TFX:{0}:{1}", tableID.ToString(), fieldIndex.ToString());
+            return string.Format("S:{0}:{1}", tableID.ToString(), fieldIndex.ToString());
         }
 
         private string GetTableRowRedisKey(Int32 tableID, string primaryKeyValue)
         {
-            return string.Format("HA:TRW:{0}:{1}", tableID.ToString(), primaryKeyValue);
+            return string.Format("W:{0}:{1}", tableID.ToString(), primaryKeyValue);
         }
 
         private string GetTablePrimaryKeyListRedisKey(string tableName)
         {
-            return string.Format("SE:TPK:{0}", tableName);
+            return string.Format("K:{0}", tableName);
         }
 
         private string GetTableLockRedisKey(string tableName, string primaryKeyValue)
         {
-            return string.Format("ST:TLK:{0}:{1}", tableName, primaryKeyValue);
+            return string.Format("L:{0}:{1}", tableName, primaryKeyValue);
         }
 
         private async Task<bool> EnterTableLock(string tableName, string primaryKeyValue)
@@ -143,15 +144,50 @@ namespace Redisql
                     {
                         case "System.Byte": fs.fieldType = typeof(Byte); break;
                         case "System.Int16": fs.fieldType = typeof(Int16); break;
-                        case "System.UInt16": fs.fieldType = typeof(UInt16); break;
+                        case "System.UInt16": fs.fieldType = typeof(UInt16);break;
                         case "System.Int32": fs.fieldType = typeof(Int32); break;
                         case "System.UInt32": fs.fieldType = typeof(UInt32); break;
-                        case "System.Int64": fs.fieldType = typeof(Int64); break;
+                        case "System.Int64": fs.fieldType = typeof(Int64);  break;
                         case "System.UInt64": fs.fieldType = typeof(UInt64); break;
                         case "System.Single": fs.fieldType = typeof(Single); break;
                         case "System.Double": fs.fieldType = typeof(Double); break;
                         case "System.String": fs.fieldType = typeof(String); break;
                         case "System.DateTime": fs.fieldType = typeof(DateTime); break;
+                    }
+
+                    if (tokens[5].Equals("null"))
+                    {
+                        fs.fieldDefaultValue = null;
+                    }
+                    else
+                    {
+                        switch (tokens[1])
+                        {
+                            case "System.Byte": fs.fieldDefaultValue = Convert.ToByte(tokens[5]); break;
+                            case "System.Int16": fs.fieldDefaultValue = Convert.ToInt16(tokens[5]); break;
+                            case "System.UInt16": fs.fieldDefaultValue = Convert.ToUInt16(tokens[5]); break;
+                            case "System.Int32": fs.fieldDefaultValue = Convert.ToInt32(tokens[5]); break;
+                            case "System.UInt32": fs.fieldDefaultValue = Convert.ToUInt32(tokens[5]); break;
+                            case "System.Int64": fs.fieldDefaultValue = Convert.ToInt64(tokens[5]); break;
+                            case "System.UInt64": fs.fieldDefaultValue = Convert.ToUInt64(tokens[5]); break;
+                            case "System.Single": fs.fieldDefaultValue = Convert.ToSingle(tokens[5]); break;
+                            case "System.Double": fs.fieldDefaultValue = Convert.ToDouble(tokens[5]); break;
+                            case "System.String": fs.fieldDefaultValue = Convert.ToString(tokens[5]); break;
+                            case "System.DateTime":
+                                if (tokens[5].ToLower().Equals("now"))
+                                {
+                                    fs.fieldDefaultValue = "now";
+                                }
+                                else if (tokens[5].ToLower().Equals("utcnow"))
+                                {
+                                    fs.fieldDefaultValue = "utcnow";
+                                }
+                                else
+                                {
+                                    fs.fieldDefaultValue = Convert.ToDateTime(tokens[5]);
+                                }
+                                break;
+                        }
                     }
                     
                     fs.fieldIndexFlag = Convert.ToBoolean(tokens[2]);
@@ -182,9 +218,10 @@ namespace Redisql
             return ts;
         }
 
-        // List<Tuple<string,Type,bool,bool>> fieldList : fieldName, fieldType, IndexFlag, sortFlag
-        public async Task<bool> CreateTable(string tableName, string primaryKeyFieldName, List<Tuple<string, Type, bool, bool>> fieldInfoList)
+        // List<Tuple<string,Type,bool,bool,object>> fieldList : fieldName, fieldType, IndexFlag, sortFlag, defaultValue
+        public async Task<bool> CreateTable(string tableName, string primaryKeyFieldName, List<Tuple<string, Type, bool, bool, object>> fieldInfoList)
         {
+            bool enterTableLock = false;
             try
             {
                 // check input parameters 
@@ -210,6 +247,10 @@ namespace Redisql
                     }
                 }
 
+                // 모든 테이블은 기본적으로 _id field가 추가되고 이 필드는 자동 증가값을 갖는다.
+                fieldInfoList.Insert(0, new Tuple<string, Type, bool, bool, object>("_id", typeof(Int64), false, false, null));
+
+                enterTableLock = true;
                 await EnterTableLock(tableName, "");
 
                 var db = this.redis.GetDatabase();
@@ -236,13 +277,19 @@ namespace Redisql
                     bool pkFlag = false;
                     bool indexFlag = t.Item3;
                     bool sortFlag = t.Item4;
+                    object defaultValue = t.Item5;
+                    if (defaultValue == null)
+                    {
+                        defaultValue = "null";
+                    }
+
                     if (t.Item1.Equals(primaryKeyFieldName))
                     {
                         pkFlag = true;
                         indexFlag = false;
                     }
 
-                    var value = string.Format("{0},{1},{2},{3},{4}", (fieldIndex++).ToString(), t.Item2.ToString(), indexFlag.ToString(), pkFlag.ToString(), sortFlag.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
+                    var value = string.Format("{0},{1},{2},{3},{4},{5}", (fieldIndex++).ToString(), t.Item2.ToString(), indexFlag.ToString(), pkFlag.ToString(), sortFlag.ToString(), defaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
                     await db.HashSetAsync(tableSchemaName, t.Item1, value);
                 }
 
@@ -254,18 +301,11 @@ namespace Redisql
             }
             finally
             {
-                LeaveTableLock(tableName, "");
+                if (enterTableLock)
+                {
+                    LeaveTableLock(tableName, "");
+                }
             }
-        }
-
-        public async Task<bool> AddNewFieldToTable()
-        {
-            return true;
-        }
-
-        public async Task<bool> DeleteExistingFieldInTable()
-        {
-            return true;
         }
 
         private Double ConvertToScore(Type type, string value)
@@ -289,9 +329,10 @@ namespace Redisql
             }
         }
 
-        public async Task<bool> InsertTableRow(string tableName, Dictionary<string, string> fieldValues)
+        // 테이블 row를 추가하고 추가된 row의 자동 증가 _id값을 얻는다.
+        public async Task<Int64> InsertTableRow(string tableName, Dictionary<string, string> fieldValues)
         {
-            bool enterLock = false;
+            string key;
             string primaryKeyValue = null;
 
             try
@@ -301,31 +342,96 @@ namespace Redisql
                 var ts = await GetTableSetting(tableName);
                 if (null == ts)
                 {
-                    return false;
+                    return -1;
                 }
 
-                // get primaryKey value of insert row
-                if (!fieldValues.TryGetValue(ts.primaryKeyFieldName, out primaryKeyValue))
-                    return false;
+                if (!ts.primaryKeyFieldName.Equals("_id"))
+                {
+                    // Insert하려는 row의 primary key field가 이미 존재하면 insert는 할수 없음
+                    // get primaryKey value of insert row
+                    if (!fieldValues.TryGetValue(ts.primaryKeyFieldName, out primaryKeyValue))
+                    {
+                        return -1;
+                    }
 
-                enterLock = true;
-                await EnterTableLock(tableName, primaryKeyValue);
+                    // check if row already exists
+                    key = GetTableRowRedisKey(ts.tableID, primaryKeyValue);
+                    var ret = await db.KeyExistsAsync(key);
+                    if (ret)
+                    {
+                        return -1;
+                    }
+                }
+                
+                HashEntry[] heArray = new HashEntry[ts.tableSchemaDic.Count]; 
 
-                string key;
-                int arrayIndex = 0;
+                // 자동 증가값 _id의 값을 설정한다.
+                var idValue = await db.HashIncrementAsync(Consts.RedisKey_Hash_TableAutoIncrementFieldValues, ts.tableID.ToString());
+                heArray[0] = new HashEntry(0, idValue);
+
+                if (ts.primaryKeyFieldName.Equals("_id"))
+                {
+                    primaryKeyValue = idValue.ToString();
+                }
+
+                
+                int arrayIndex = 1;
                 List<Task> tasklist = new List<Task>();
-                HashEntry[] heArray = new HashEntry[fieldValues.Count];
+                
                 foreach (var e in ts.tableSchemaDic)
                 {
-                    string value;
-                    if (fieldValues.TryGetValue(e.Key, out value))
+                    var fs = e.Value;
+                    if (!e.Key.Equals("_id")) // _id field는 사용자가 값을 할당할 수 없다.
                     {
-                        heArray[arrayIndex++] = new HashEntry(e.Value.fieldIndex, value);
+                        string value;
+                        if (fieldValues.TryGetValue(e.Key, out value))
+                        {
+                            heArray[arrayIndex++] = new HashEntry(fs.fieldIndex, value);
+                        }
+                        else
+                        {
+                            // apply default value
+                            if (null == fs.fieldDefaultValue)
+                            {
+                                // This field has no default value
+                                return -1;
+                            }
+                            else
+                            {
+                                switch (fs.fieldType.ToString())
+                                {
+                                    case "System.Byte": 
+                                    case "System.Int16":
+                                    case "System.UInt16":
+                                    case "System.Int32":
+                                    case "System.UInt32":
+                                    case "System.Single":
+                                    case "System.Double":
+                                        heArray[arrayIndex++] = new HashEntry(fs.fieldIndex, fs.fieldDefaultValue.ToString());
+                                        break;
+
+                                    case "System.DateTime":
+                                        if (fs.fieldDefaultValue.Equals("now"))
+                                        {
+                                            heArray[arrayIndex++] = new HashEntry(fs.fieldIndex, DateTime.Now.ToString());
+                                        }
+                                        else if (fs.fieldDefaultValue.Equals("utcnow"))
+                                        {
+                                            heArray[arrayIndex++] = new HashEntry(fs.fieldIndex, DateTime.UtcNow.ToString());
+                                        }
+                                        else
+                                        {
+                                            heArray[arrayIndex++] = new HashEntry(fs.fieldIndex, fs.fieldDefaultValue.ToString());
+                                        }
+                                        break;
+                                }
+                            }
+                        }
 
                         if (e.Value.fieldIndexFlag)
                         {
                             // make index
-                            key = GetTableFieldIndexRedisKey(ts.tableID, e.Value.fieldIndex, value); 
+                            key = GetTableFieldIndexRedisKey(ts.tableID, e.Value.fieldIndex, value);
                             tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
                         }
 
@@ -339,13 +445,12 @@ namespace Redisql
                     }
                     else
                     {
-                        // apply default value?
-                        return false;
+                        // _id field
                     }
                 }
 
                 // save table row
-                key = GetTableRowRedisKey(ts.tableID, primaryKeyValue); 
+                key = GetTableRowRedisKey(ts.tableID, primaryKeyValue);
                 tasklist.Add(db.HashSetAsync(key, heArray));
 
                 // save table primary key 
@@ -357,18 +462,11 @@ namespace Redisql
                     await task;
                 }
 
-                return true;
+                return idValue;
             }
             catch (Exception ex)
             {
-                return false;
-            }
-            finally
-            {
-                if (enterLock)
-                {
-                    LeaveTableLock(tableName, primaryKeyValue);
-                }
+                return -1;
             }
         }
 
@@ -563,7 +661,7 @@ namespace Redisql
 
         // primaryKeyValue하고 일치하는 테이블 row 1개를 선택한다.
         // selectFields : 선택할 field name list. 만약 null이면 모든 field를 선택한다.
-        public async Task<Dictionary<string, string>> SelectTableRowByPrimaryKey(List<string> selectFields, string tableName, string primaryKeyValue)
+        public async Task<Dictionary<string, string>> SelectTableRowByPrimaryKeyField(List<string> selectFields, string tableName, string primaryKeyValue)
         {
             var retdic = new Dictionary<string, string>();
             var ts = await GetTableSetting(tableName);
