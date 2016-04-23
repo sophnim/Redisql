@@ -38,7 +38,7 @@ namespace Redisql
             string connString = null;
             if (string.IsNullOrEmpty(redisPassword))
             {
-                connString = string.Format("{0}:{1}", redisIp, redisPort);
+                connString = string.Format("{0}:{1}", redisIp, redisPort.ToString());
             }
             else
             {
@@ -56,17 +56,17 @@ namespace Redisql
 
         private string GetTableFieldIndexRedisKey(Int32 tableID, Int32 fieldIndex, string value)
         {
-            return string.Format("SE:TFX:{0}:{1}:{2}", tableID, fieldIndex, value);
+            return string.Format("SE:TFX:{0}:{1}:{2}", tableID.ToString(), fieldIndex.ToString(), value);
         }
 
         private string GetTableFieldSortedSetIndexRedisKey(Int32 tableID, Int32 fieldIndex)
         {
-            return string.Format("SO:TFX:{0}:{1}", tableID, fieldIndex);
+            return string.Format("SO:TFX:{0}:{1}", tableID.ToString(), fieldIndex.ToString());
         }
 
         private string GetTableRowRedisKey(Int32 tableID, string primaryKeyValue)
         {
-            return string.Format("HA:TRW:{0}:{1}", tableID, primaryKeyValue);
+            return string.Format("HA:TRW:{0}:{1}", tableID.ToString(), primaryKeyValue);
         }
 
         private string GetTablePrimaryKeyListRedisKey(string tableName)
@@ -122,7 +122,7 @@ namespace Redisql
                     return null;
                 }
 
-                ts.tableID = Convert.ToInt32(tableID);
+                ts.tableID = Convert.ToInt32(tableID.ToString());
 
                 // read table schema
                 var tableSchema = await db.HashGetAllAsync(GetTableSchemaRedisKey(tableName));
@@ -157,7 +157,7 @@ namespace Redisql
                     fs.fieldIndexFlag = Convert.ToBoolean(tokens[2]);
                     if (fs.fieldIndexFlag)
                     {
-                        ts.indexedFieldDic.Add(e.Name, fs.fieldIndex);
+                        ts.indexedFieldDic.Add(e.Name.ToString(), fs.fieldIndex);
                     }
 
                     var fieldPrimaryKeyFlag = Convert.ToBoolean(tokens[3]);
@@ -169,11 +169,11 @@ namespace Redisql
                     fs.fieldSortFlag = Convert.ToBoolean(tokens[4]);
                     if (fs.fieldSortFlag)
                     {
-                        ts.sortedFieldDic.Add(e.Name, fs.fieldIndex);
+                        ts.sortedFieldDic.Add(e.Name.ToString(), fs.fieldIndex);
                     }
 
-                    ts.fieldIndexNameDic.Add(fs.fieldIndex.ToString(), e.Name);
-                    ts.tableSchemaDic.Add(e.Name, fs);
+                    ts.fieldIndexNameDic.Add(fs.fieldIndex.ToString(), e.Name.ToString());
+                    ts.tableSchemaDic.Add(e.Name.ToString(), fs);
                 }
 
                 this.tableSettingDic.TryAdd(tableName, ts);
@@ -242,7 +242,7 @@ namespace Redisql
                         indexFlag = false;
                     }
 
-                    var value = string.Format("{0},{1},{2},{3},{4}", fieldIndex++, t.Item2.ToString(), indexFlag.ToString(), pkFlag.ToString(), sortFlag.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
+                    var value = string.Format("{0},{1},{2},{3},{4}", (fieldIndex++).ToString(), t.Item2.ToString(), indexFlag.ToString(), pkFlag.ToString(), sortFlag.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
                     await db.HashSetAsync(tableSchemaName, t.Item1, value);
                 }
 
@@ -256,6 +256,16 @@ namespace Redisql
             {
                 LeaveTableLock(tableName, "");
             }
+        }
+
+        public async Task<bool> AddNewFieldToTable()
+        {
+            return true;
+        }
+
+        public async Task<bool> DeleteExistingFieldInTable()
+        {
+            return true;
         }
 
         private Double ConvertToScore(Type type, string value)
@@ -515,7 +525,7 @@ namespace Redisql
                 // 인덱스 삭제
                 foreach (var fieldIndex in ts.indexedFieldDic.Values)
                 {
-                    key = GetTableFieldIndexRedisKey(ts.tableID, fieldIndex, ret[Convert.ToInt32(fieldIndex)].Value); 
+                    key = GetTableFieldIndexRedisKey(ts.tableID, fieldIndex, ret[Convert.ToInt32(fieldIndex)].Value.ToString()); 
                     tasklist.Add(db.SetRemoveAsync(key, primaryKeyValue));
                 }
 
@@ -571,7 +581,7 @@ namespace Redisql
                     {
                         var e = ret[i];
                         string tableFieldName;
-                        if (ts.fieldIndexNameDic.TryGetValue(e.Name, out tableFieldName))
+                        if (ts.fieldIndexNameDic.TryGetValue(e.Name.ToString(), out tableFieldName))
                         {
                             retdic.Add(tableFieldName, e.Value.ToString());
                         }
@@ -593,7 +603,7 @@ namespace Redisql
                     else
                     {
                         // 존재하지 않는 field
-                        
+                        throw new Exception(string.Format("Table '{0}' does not have '{1}' field", tableName, selectFields[i]));
                     }
                 }
                 var ret = await db.HashGetAsync(key, rv);
@@ -621,37 +631,80 @@ namespace Redisql
             {
                 return retlist;
             }
-
-            List<Task<HashEntry[]>> tasklist = new List<Task<HashEntry[]>>();
+            
             var key = GetTableFieldIndexRedisKey(ts.tableID, fs.fieldIndex, value);
             var pkvs = await db.SetMembersAsync(key);
-            foreach (var pk in pkvs)
+            
+            if (null == selectFields)
             {
-                key = GetTableRowRedisKey(ts.tableID, pk.ToString());
-                tasklist.Add(db.HashGetAllAsync(key));
-            }
-
-            foreach (var task in tasklist)
-            {
-                await task;
-                var heArray = task.Result;
-                var dic = new Dictionary<string, string>();
-                foreach (var he in heArray)
+                // selectedFields가 null이면 모든 field를 읽는다.
+                var tasklist = new List<Task<HashEntry[]>>();
+                foreach (var pk in pkvs)
                 {
-                    string tableFieldName;
-                    if (ts.fieldIndexNameDic.TryGetValue(he.Name, out tableFieldName))
+                    key = GetTableRowRedisKey(ts.tableID, pk.ToString());
+                    tasklist.Add(db.HashGetAllAsync(key));
+                }
+
+                foreach (var task in tasklist)
+                {
+                    await task;
+                    var heArray = task.Result;
+                    var dic = new Dictionary<string, string>();
+                    foreach (var he in heArray)
                     {
-                        dic.Add(tableFieldName, he.Value);
+                        string tableFieldName;
+                        if (ts.fieldIndexNameDic.TryGetValue(he.Name.ToString(), out tableFieldName))
+                        {
+                            dic.Add(tableFieldName, he.Value.ToString());
+                        }
+                    }
+                    retlist.Add(dic);
+                }
+            }
+            else
+            {
+                // selectField가 null이 아니면 해당 field만 읽는다.
+                var len = selectFields.Count;
+                var rva = new RedisValue[len];
+                for (var i = 0; i < len; i++)
+                {
+                    if (ts.tableSchemaDic.TryGetValue(selectFields[i], out fs))
+                    {
+                        rva[i] = fs.fieldIndex.ToString();
+                    }
+                    else
+                    {
+                        // 존재하지 않는 field
+                        throw new Exception(string.Format("Table '{0}' does not have '{1}' field", tableName, selectFields[i]));
                     }
                 }
-                retlist.Add(dic);
+
+                var tasklist = new List<Task<RedisValue[]>>();
+                foreach (var pk in pkvs)
+                {
+                    key = GetTableRowRedisKey(ts.tableID, pk.ToString());
+                    tasklist.Add(db.HashGetAsync(key, rva));
+                }
+
+                foreach (var task in tasklist)
+                {
+                    await task;
+                    rva = task.Result;
+                    var dic = new Dictionary<string, string>();
+
+                    for (var i = 0; i < len; i++)
+                    {
+                        dic.Add(selectFields[i], rva[i].ToString());
+                    }
+                    retlist.Add(dic);
+                }
             }
 
             return retlist;
         }
 
         // sort된 field값이 lowValue와 highValue 사이에 있는 모든 row를 구한다.
-        public async Task<List<Dictionary<string, string>>> SelectTableRowBySortedFieldRange(string tableName, string fieldName, string lowValue, string highValue)
+        public async Task<List<Dictionary<string, string>>> SelectTableRowBySortedFieldRange(List<string> selectFields, string tableName, string fieldName, string lowValue, string highValue)
         {
             var retlist = new List<Dictionary<string, string>>();
             var ts = await GetTableSetting(tableName);
@@ -667,29 +720,71 @@ namespace Redisql
             var hv = ConvertToScore(fs.fieldType, highValue);
 
             var key = GetTableFieldSortedSetIndexRedisKey(ts.tableID, fs.fieldIndex);
-            var ret = await db.SortedSetRangeByScoreAsync(key, lv, hv);
+            var primaryKeyValues = await db.SortedSetRangeByScoreAsync(key, lv, hv);
 
-            List<Task<HashEntry[]>> tasklist = new List<Task<HashEntry[]>>();
-            foreach (var primaryKeyValue in ret)
+            if (null == selectFields)
             {
-                key = GetTableRowRedisKey(ts.tableID, primaryKeyValue);
-                tasklist.Add(db.HashGetAllAsync(key));
-            }
-
-            foreach (var task in tasklist)
-            {
-                await task;
-                var heArray = task.Result;
-                var dic = new Dictionary<string, string>();
-                foreach (var he in heArray)
+                // selectField가 null이면 모든 field를 읽는다.
+                List<Task<HashEntry[]>> tasklist = new List<Task<HashEntry[]>>();
+                foreach (var primaryKeyValue in primaryKeyValues)
                 {
-                    string tableFieldName;
-                    if (ts.fieldIndexNameDic.TryGetValue(he.Name, out tableFieldName))
+                    key = GetTableRowRedisKey(ts.tableID, primaryKeyValue.ToString());
+                    tasklist.Add(db.HashGetAllAsync(key));
+                }
+
+                foreach (var task in tasklist)
+                {
+                    await task;
+                    var heArray = task.Result;
+                    var dic = new Dictionary<string, string>();
+                    foreach (var he in heArray)
                     {
-                        dic.Add(tableFieldName, he.Value);
+                        string tableFieldName;
+                        if (ts.fieldIndexNameDic.TryGetValue(he.Name.ToString(), out tableFieldName))
+                        {
+                            dic.Add(tableFieldName, he.Value.ToString());
+                        }
+                    }
+                    retlist.Add(dic);
+                }
+            }
+            else
+            {
+                // selectField가 null이 아니면 해당 field만 읽는다.
+                var len = selectFields.Count;
+                var rva = new RedisValue[len];
+                for (var i = 0; i < len; i++)
+                {
+                    if (ts.tableSchemaDic.TryGetValue(selectFields[i], out fs))
+                    {
+                        rva[i] = fs.fieldIndex.ToString();
+                    }
+                    else
+                    {
+                        // 존재하지 않는 field
+                        throw new Exception(string.Format("Table '{0}' does not have '{1}' field", tableName, selectFields[i]));
                     }
                 }
-                retlist.Add(dic);
+
+                var tasklist = new List<Task<RedisValue[]>>();
+                foreach (var primaryKeyValue in primaryKeyValues)
+                {
+                    key = GetTableRowRedisKey(ts.tableID, primaryKeyValue.ToString());
+                    tasklist.Add(db.HashGetAsync(key, rva));
+                }
+
+                foreach (var task in tasklist)
+                {
+                    await task;
+                    rva = task.Result;
+                    var dic = new Dictionary<string, string>();
+
+                    for (var i = 0; i < len; i++)
+                    {
+                        dic.Add(selectFields[i], rva[i].ToString());
+                    }
+                    retlist.Add(dic);
+                }
             }
 
             return retlist; 
