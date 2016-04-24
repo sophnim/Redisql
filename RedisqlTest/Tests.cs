@@ -152,7 +152,7 @@ namespace RedisqlTest
             
             List<Task> tasklist = new List<Task>();
             var stw = Stopwatch.StartNew();
-            int testCount = 100;
+            int testCount = 10;
             for (var i = 0; i < testCount; i++)
             {
                 var valueDic = new Dictionary<string, string>() {

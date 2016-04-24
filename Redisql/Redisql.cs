@@ -513,6 +513,19 @@ namespace Redisql
                 fs.fieldSortFlag = sortFlag;
                 fs.fieldDefaultValue = defaultValue;
 
+                if (fs.fieldType == typeof(DateTime))
+                {
+                    var dvt = defaultValue.ToString().ToLower();
+                    if (dvt.Equals("now"))
+                    {
+                        defaultValue = DateTime.Now.ToString();
+                    }
+                    else if (dvt.Equals("utcnow"))
+                    {
+                        defaultValue = DateTime.UtcNow.ToString();
+                    }
+                }
+
                 ts.tableSchemaDic.Add(fieldName, fs);
 
                 if (IndexFlag)
