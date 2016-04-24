@@ -27,6 +27,17 @@ namespace Redisql
         public Dictionary<string, Int32> indexedFieldDic = new Dictionary<string, int>();
         public Dictionary<string, Int32> sortedFieldDic = new Dictionary<string, int>();
         public Dictionary<string, string> fieldIndexNameDic = new Dictionary<string, string>();
+
+        public Int32 GetNextFieldIndex()
+        {
+            Int32 maxFieldIndex = 0;
+            foreach (var fs in tableSchemaDic.Values)
+            {
+                if (maxFieldIndex < fs.fieldIndex) maxFieldIndex = fs.fieldIndex;
+            }
+
+            return maxFieldIndex +1;
+        }
     }
 
     public class Redisql
@@ -80,7 +91,7 @@ namespace Redisql
             return string.Format("L:{0}:{1}", tableName, primaryKeyValue);
         }
 
-        private async Task<bool> EnterTableLock(string tableName, string primaryKeyValue)
+        private async Task<bool> TableLockEnterAsync(string tableName, string primaryKeyValue)
         {
             var db = this.redis.GetDatabase();
             var key = GetTableLockRedisKey(tableName, primaryKeyValue);
@@ -99,14 +110,14 @@ namespace Redisql
             return true;
         }
 
-        private void LeaveTableLock(string tableName, string primaryKeyValue)
+        private void TableLockExit(string tableName, string primaryKeyValue)
         {
             var db = this.redis.GetDatabase();
             var key = GetTableLockRedisKey(tableName, primaryKeyValue);
             db.KeyDeleteAsync(key, CommandFlags.FireAndForget);
         }
 
-        private async Task<TableSetting> GetTableSetting(string tableName)
+        private async Task<TableSetting> TableGetSettingAsync(string tableName)
         {
             TableSetting ts;
             var db = this.redis.GetDatabase();
@@ -218,8 +229,69 @@ namespace Redisql
             return ts;
         }
 
+        public async Task<bool> TableDeleteAsync(string tableName)
+        {
+            bool enterTableLock = false;
+            try
+            {
+                enterTableLock = true;
+                await TableLockEnterAsync(tableName, "");
+
+                // 테이블을 지울때는 테이블 데이터만 지우고 TableID, 자동 증가값은 지우지 않는다. 다시 생성될때를 대비하기 위함이다.
+                var db = this.redis.GetDatabase();
+
+                var ts = await TableGetSettingAsync(tableName);
+                if (null == ts)
+                {
+                    return false;
+                }
+
+                var key = GetTablePrimaryKeyListRedisKey(tableName);
+
+                // 모든 Table row를 지워서 삭제한다.
+                var tasklist = new List<Task<bool>>();
+                var pkvs =  await db.SetMembersAsync(key);
+                foreach (var primaryKeyValue in pkvs)
+                {
+                    tasklist.Add(TableDeleteRowAsync(tableName, primaryKeyValue.ToString()));
+                }
+
+                // 테이블 스키마 삭제
+                key = GetTableSchemaRedisKey(tableName);
+                tasklist.Add(db.KeyDeleteAsync(key));
+
+                // 테이블 ID 해시 삭제
+                tasklist.Add(db.HashDeleteAsync(Consts.RedisKey_Hash_TableNameIds, tableName));
+
+                // 테이블 자동 증가 값 해시 삭제
+                tasklist.Add(db.HashDeleteAsync(Consts.RedisKey_Hash_TableAutoIncrementFieldValues, ts.tableID));
+
+                foreach (var t in tasklist)
+                {
+                    await t;
+                }
+
+                // 메모리상의 테이블 세팅 삭제
+                this.tableSettingDic.TryRemove(tableName, out ts);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+
+                return false;
+            }
+            finally
+            {
+                if (enterTableLock)
+                {
+                    TableLockExit(tableName, "");
+                }
+            }
+        }
+
         // List<Tuple<string,Type,bool,bool,object>> fieldList : fieldName, fieldType, IndexFlag, sortFlag, defaultValue
-        public async Task<bool> CreateTable(string tableName, string primaryKeyFieldName, List<Tuple<string, Type, bool, bool, object>> fieldInfoList)
+        public async Task<bool> TableCreateAsync(string tableName, string primaryKeyFieldName, List<Tuple<string, Type, bool, bool, object>> fieldInfoList)
         {
             bool enterTableLock = false;
             try
@@ -251,7 +323,7 @@ namespace Redisql
                 fieldInfoList.Insert(0, new Tuple<string, Type, bool, bool, object>("_id", typeof(Int64), false, false, null));
 
                 enterTableLock = true;
-                await EnterTableLock(tableName, "");
+                await TableLockEnterAsync(tableName, "");
 
                 var db = this.redis.GetDatabase();
 
@@ -303,7 +375,204 @@ namespace Redisql
             {
                 if (enterTableLock)
                 {
-                    LeaveTableLock(tableName, "");
+                    TableLockExit(tableName, "");
+                }
+            }
+        }
+
+        public async Task<bool> TableEraseExistingFieldAsync(string tableName, string fieldName)
+        {
+            bool enterTableLock = false;
+            try
+            {
+                var db = this.redis.GetDatabase();
+
+                var ts = await TableGetSettingAsync(tableName);
+                if (null == ts)
+                {
+                    return false;
+                }
+
+                if (ts.primaryKeyFieldName.Equals(fieldName))
+                {
+                    return false; // Can not delete PrimaryKey Field
+                }
+
+                enterTableLock = true;
+                await TableLockEnterAsync(tableName, "");
+
+                FieldSetting fs;
+                if (!ts.tableSchemaDic.TryGetValue(ts.primaryKeyFieldName, out fs))
+                {
+                    return false;
+                }
+                var primaryKeyFieldIndex = fs.fieldIndex;
+
+                if (!ts.tableSchemaDic.TryGetValue(fieldName, out fs))
+                {
+                    return false;
+                }
+
+                var tasklist = new List<Task<RedisValue[]>>();
+                var key = GetTablePrimaryKeyListRedisKey(tableName);
+                var pvks = await db.SetMembersAsync(key);
+
+                // field에 저장된 값을 먼저 읽는다.
+                var rva = new RedisValue[2];
+                rva[0] = primaryKeyFieldIndex;
+                rva[1] = fs.fieldIndex;
+                foreach (var primaryKeyValue in pvks)
+                {
+                    key = GetTableRowRedisKey(ts.tableID, primaryKeyValue.ToString());
+                    tasklist.Add(db.HashGetAsync(key, rva));
+                }
+
+                var tasklist2 = new List<Task<bool>>();
+                foreach (var t in tasklist)
+                {
+                    var ret = await t;
+                    if (fs.fieldIndexFlag)
+                    {
+                        key = GetTableFieldIndexRedisKey(ts.tableID, fs.fieldIndex, ret[1].ToString());
+                        tasklist2.Add(db.SetRemoveAsync(key, ret[0].ToString()));
+                    }
+
+                    if (fs.fieldSortFlag)
+                    {
+                        key = GetTableFieldSortedSetIndexRedisKey(ts.tableID, fs.fieldIndex);
+                        tasklist2.Add(db.SortedSetRemoveAsync(key, ret[0].ToString()));
+                    }
+
+                    key = GetTableRowRedisKey(ts.tableID, ret[0].ToString());
+                    tasklist2.Add(db.HashDeleteAsync(key, fs.fieldIndex));
+                }
+
+                foreach (var t in tasklist2)
+                {
+                    if (!await t) return false;
+                }
+
+                // 데이터를 다 지웠으니 테이블 스키마 제거
+                ts.tableSchemaDic.Remove(fieldName);
+                ts.fieldIndexNameDic.Remove(fs.fieldIndex.ToString());
+
+                Int32 v;
+                if (ts.indexedFieldDic.TryGetValue(fieldName, out v))
+                {
+                    ts.indexedFieldDic.Remove(fieldName);
+                }
+
+                if (ts.sortedFieldDic.TryGetValue(fieldName, out v))
+                {
+                    ts.sortedFieldDic.Remove(fieldName);
+                }
+
+                key = GetTableSchemaRedisKey(tableName);
+                await db.HashDeleteAsync(key, fieldName);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
+            finally
+            {
+                if (enterTableLock)
+                {
+                    TableLockExit(tableName, "");
+                }
+            }
+        }
+
+        public async Task<bool> TableAddNewFieldAsync(string tableName, string fieldName, Type fieldType, bool IndexFlag, bool sortFlag, object defaultValue)
+        {
+            bool enterTableLock = false;
+            try
+            {
+                if (defaultValue == null)
+                {
+                    return false;
+                }
+
+                var db = this.redis.GetDatabase();
+
+                var ts = await TableGetSettingAsync(tableName);
+                if (null == ts)
+                {
+                    return false;
+                }
+
+                enterTableLock = true;
+                await TableLockEnterAsync(tableName, "");
+
+                var fs = new FieldSetting();
+                fs.fieldIndex = ts.GetNextFieldIndex();
+                fs.fieldType = fieldType;
+                fs.fieldIndexFlag = IndexFlag;
+                fs.fieldSortFlag = sortFlag;
+                fs.fieldDefaultValue = defaultValue;
+
+                ts.tableSchemaDic.Add(fieldName, fs);
+
+                if (IndexFlag)
+                {
+                    ts.indexedFieldDic.Add(fieldName, fs.fieldIndex);
+                }
+
+                if (sortFlag)
+                {
+                    ts.sortedFieldDic.Add(fieldName, fs.fieldIndex);
+                }
+
+                ts.fieldIndexNameDic.Add(fs.fieldIndex.ToString(), fieldName);
+
+                var tableSchemaName = GetTableSchemaRedisKey(tableName);
+                
+                var value = string.Format("{0},{1},{2},{3},{4},{5}", fs.fieldIndex.ToString(), fs.fieldType.ToString(), IndexFlag.ToString(), "False", sortFlag.ToString(), defaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
+                await db.HashSetAsync(tableSchemaName, fieldName, value);
+
+                // 테이블 스키마 수정 완료되었으니 기존에 존재하는 테이블 아이템에 새로 추가된 field를 defaultValue로 모두 입력한다.
+                var tasklist = new List<Task<bool>>();
+                var key = GetTablePrimaryKeyListRedisKey(tableName);
+                var pvks = await db.SetMembersAsync(key);
+                foreach (var primaryKeyValue in pvks)
+                {
+                    key = GetTableRowRedisKey(ts.tableID, primaryKeyValue.ToString());
+                    tasklist.Add(db.HashSetAsync(key, fs.fieldIndex.ToString(), defaultValue.ToString()));
+
+                    if (IndexFlag)
+                    {
+                        // make index
+                        key = GetTableFieldIndexRedisKey(ts.tableID, fs.fieldIndex, defaultValue.ToString());
+                        tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
+                    }
+
+                    if (sortFlag)
+                    {
+                        // sorted set index
+                        key = GetTableFieldSortedSetIndexRedisKey(ts.tableID, fs.fieldIndex);
+                        var score = ConvertToScore(fs.fieldType, defaultValue.ToString());
+                        tasklist.Add(db.SortedSetAddAsync(key, primaryKeyValue, score));
+                    }
+                }
+
+                foreach (var t in tasklist)
+                {
+                    if (!await t) return false; 
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
+            finally
+            {
+                if (enterTableLock)
+                {
+                    TableLockExit(tableName, "");
                 }
             }
         }
@@ -330,7 +599,7 @@ namespace Redisql
         }
 
         // 테이블 row를 추가하고 추가된 row의 자동 증가 _id값을 얻는다.
-        public async Task<Int64> InsertTableRow(string tableName, Dictionary<string, string> fieldValues)
+        public async Task<Int64> TableInsertRowAsync(string tableName, Dictionary<string, string> fieldValues)
         {
             string key;
             string primaryKeyValue = null;
@@ -339,7 +608,7 @@ namespace Redisql
             {
                 var db = this.redis.GetDatabase();
 
-                var ts = await GetTableSetting(tableName);
+                var ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
                 {
                     return -1;
@@ -470,7 +739,7 @@ namespace Redisql
             }
         }
 
-        public async Task<bool> UpdateTableRow(string tableName, Dictionary<string, string> updateFieldValues)
+        public async Task<bool> TableUpdateRowAsync(string tableName, Dictionary<string, string> updateFieldValues)
         {
             bool enterLock = false;
             string primaryKeyValue = null;
@@ -480,7 +749,7 @@ namespace Redisql
                 var db = this.redis.GetDatabase();
                 List<Task> tasklist = new List<Task>();
 
-                var ts = await GetTableSetting(tableName);
+                var ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
                 {
                     return false;
@@ -520,7 +789,7 @@ namespace Redisql
                 }
 
                 enterLock = true;
-                await EnterTableLock(tableName, primaryKeyValue);
+                await TableLockEnterAsync(tableName, primaryKeyValue);
 
                 string key;
 
@@ -592,21 +861,21 @@ namespace Redisql
             {
                 if (enterLock)
                 {
-                    LeaveTableLock(tableName, primaryKeyValue);
+                    TableLockExit(tableName, primaryKeyValue);
                 }
             }
         }
 
-        public async Task<bool> DeleteTableRow(string tableName, string primaryKeyValue)
+        public async Task<bool> TableDeleteRowAsync(string tableName, string primaryKeyValue)
         {
             try
             {
-                await EnterTableLock(tableName, primaryKeyValue);
+                await TableLockEnterAsync(tableName, primaryKeyValue);
 
                 var db = this.redis.GetDatabase();
                 List<Task> tasklist = new List<Task>();
 
-                var ts = await GetTableSetting(tableName);
+                var ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
                 {
                     return false;
@@ -620,10 +889,16 @@ namespace Redisql
                     return false;
                 }
 
+                var fvdic = new Dictionary<string, string>();
+                foreach (var e in ret)
+                {
+                    fvdic.Add(e.Name.ToString(), e.Value.ToString());
+                }
+
                 // 인덱스 삭제
                 foreach (var fieldIndex in ts.indexedFieldDic.Values)
                 {
-                    key = GetTableFieldIndexRedisKey(ts.tableID, fieldIndex, ret[Convert.ToInt32(fieldIndex)].Value.ToString()); 
+                    key = GetTableFieldIndexRedisKey(ts.tableID, fieldIndex, fvdic[fieldIndex.ToString()]); 
                     tasklist.Add(db.SetRemoveAsync(key, primaryKeyValue));
                 }
 
@@ -638,7 +913,6 @@ namespace Redisql
                 key = GetTableRowRedisKey(ts.tableID, primaryKeyValue); 
                 tasklist.Add(db.KeyDeleteAsync(key));
 
-                // remove table primary key 
                 key = GetTablePrimaryKeyListRedisKey(tableName);  
                 tasklist.Add(db.SetRemoveAsync(key, primaryKeyValue));
 
@@ -655,16 +929,16 @@ namespace Redisql
             }
             finally
             {
-                LeaveTableLock(tableName, primaryKeyValue);
+                TableLockExit(tableName, primaryKeyValue);
             }
         }
 
         // primaryKeyValue하고 일치하는 테이블 row 1개를 선택한다.
         // selectFields : 선택할 field name list. 만약 null이면 모든 field를 선택한다.
-        public async Task<Dictionary<string, string>> SelectTableRowByPrimaryKeyField(List<string> selectFields, string tableName, string primaryKeyValue)
+        public async Task<Dictionary<string, string>> TableSelectRowByPrimaryKeyFieldMatchAsync(List<string> selectFields, string tableName, string primaryKeyValue)
         {
             var retdic = new Dictionary<string, string>();
-            var ts = await GetTableSetting(tableName);
+            var ts = await TableGetSettingAsync(tableName);
             var key = GetTableRowRedisKey(ts.tableID, primaryKeyValue);
             var db = this.redis.GetDatabase();
 
@@ -718,10 +992,10 @@ namespace Redisql
         }
 
         // 인덱스된 필드에 값이 일치하는 모든 테이블 row를 선택한다.
-        public async Task<List<Dictionary<string,string>>> SelectTableRowByIndexedField(List<string> selectFields, string tableName, string fieldName, string value)
+        public async Task<List<Dictionary<string,string>>> TableSelectRowByIndexFieldMatchAsync(List<string> selectFields, string tableName, string fieldName, string value)
         {
             var retlist = new List<Dictionary<string, string>>();
-            var ts = await GetTableSetting(tableName);
+            var ts = await TableGetSettingAsync(tableName);
             var db = this.redis.GetDatabase();
 
             FieldSetting fs;
@@ -802,10 +1076,10 @@ namespace Redisql
         }
 
         // sort된 field값이 lowValue와 highValue 사이에 있는 모든 row를 구한다.
-        public async Task<List<Dictionary<string, string>>> SelectTableRowBySortedFieldRange(List<string> selectFields, string tableName, string fieldName, string lowValue, string highValue)
+        public async Task<List<Dictionary<string, string>>> TableSelectRowBySortFieldRangeAsync(List<string> selectFields, string tableName, string fieldName, string lowValue, string highValue)
         {
             var retlist = new List<Dictionary<string, string>>();
-            var ts = await GetTableSetting(tableName);
+            var ts = await TableGetSettingAsync(tableName);
             var db = this.redis.GetDatabase();
 
             FieldSetting fs;
