@@ -142,62 +142,62 @@ namespace Redisql
                     var tokens = e.Value.ToString().Split(',');
 
                     var fs = new FieldSetting();
-                    fs.fieldIndex = Convert.ToInt32(tokens[0]);
+                    fs.indexNumber = Convert.ToInt32(tokens[0]);
 
                     switch (tokens[1])
                     {
-                        case "System.Byte": fs.fieldType = typeof(Byte); break;
-                        case "System.Int16": fs.fieldType = typeof(Int16); break;
-                        case "System.UInt16": fs.fieldType = typeof(UInt16);break;
-                        case "System.Int32": fs.fieldType = typeof(Int32); break;
-                        case "System.UInt32": fs.fieldType = typeof(UInt32); break;
-                        case "System.Int64": fs.fieldType = typeof(Int64);  break;
-                        case "System.UInt64": fs.fieldType = typeof(UInt64); break;
-                        case "System.Single": fs.fieldType = typeof(Single); break;
-                        case "System.Double": fs.fieldType = typeof(Double); break;
-                        case "System.String": fs.fieldType = typeof(String); break;
-                        case "System.DateTime": fs.fieldType = typeof(DateTime); break;
+                        case "System.Byte": fs.dataType = typeof(Byte); break;
+                        case "System.Int16": fs.dataType = typeof(Int16); break;
+                        case "System.UInt16": fs.dataType = typeof(UInt16);break;
+                        case "System.Int32": fs.dataType = typeof(Int32); break;
+                        case "System.UInt32": fs.dataType = typeof(UInt32); break;
+                        case "System.Int64": fs.dataType = typeof(Int64);  break;
+                        case "System.UInt64": fs.dataType = typeof(UInt64); break;
+                        case "System.Single": fs.dataType = typeof(Single); break;
+                        case "System.Double": fs.dataType = typeof(Double); break;
+                        case "System.String": fs.dataType = typeof(String); break;
+                        case "System.DateTime": fs.dataType = typeof(DateTime); break;
                     }
 
                     if (tokens[5].Equals("null"))
                     {
-                        fs.fieldDefaultValue = null;
+                        fs.defaultValue = null;
                     }
                     else
                     {
                         switch (tokens[1])
                         {
-                            case "System.Byte": fs.fieldDefaultValue = Convert.ToByte(tokens[5]); break;
-                            case "System.Int16": fs.fieldDefaultValue = Convert.ToInt16(tokens[5]); break;
-                            case "System.UInt16": fs.fieldDefaultValue = Convert.ToUInt16(tokens[5]); break;
-                            case "System.Int32": fs.fieldDefaultValue = Convert.ToInt32(tokens[5]); break;
-                            case "System.UInt32": fs.fieldDefaultValue = Convert.ToUInt32(tokens[5]); break;
-                            case "System.Int64": fs.fieldDefaultValue = Convert.ToInt64(tokens[5]); break;
-                            case "System.UInt64": fs.fieldDefaultValue = Convert.ToUInt64(tokens[5]); break;
-                            case "System.Single": fs.fieldDefaultValue = Convert.ToSingle(tokens[5]); break;
-                            case "System.Double": fs.fieldDefaultValue = Convert.ToDouble(tokens[5]); break;
-                            case "System.String": fs.fieldDefaultValue = Convert.ToString(tokens[5]); break;
+                            case "System.Byte": fs.defaultValue = Convert.ToByte(tokens[5]); break;
+                            case "System.Int16": fs.defaultValue = Convert.ToInt16(tokens[5]); break;
+                            case "System.UInt16": fs.defaultValue = Convert.ToUInt16(tokens[5]); break;
+                            case "System.Int32": fs.defaultValue = Convert.ToInt32(tokens[5]); break;
+                            case "System.UInt32": fs.defaultValue = Convert.ToUInt32(tokens[5]); break;
+                            case "System.Int64": fs.defaultValue = Convert.ToInt64(tokens[5]); break;
+                            case "System.UInt64": fs.defaultValue = Convert.ToUInt64(tokens[5]); break;
+                            case "System.Single": fs.defaultValue = Convert.ToSingle(tokens[5]); break;
+                            case "System.Double": fs.defaultValue = Convert.ToDouble(tokens[5]); break;
+                            case "System.String": fs.defaultValue = Convert.ToString(tokens[5]); break;
                             case "System.DateTime":
                                 if (tokens[5].ToLower().Equals("now"))
                                 {
-                                    fs.fieldDefaultValue = "now";
+                                    fs.defaultValue = "now";
                                 }
                                 else if (tokens[5].ToLower().Equals("utcnow"))
                                 {
-                                    fs.fieldDefaultValue = "utcnow";
+                                    fs.defaultValue = "utcnow";
                                 }
                                 else
                                 {
-                                    fs.fieldDefaultValue = Convert.ToDateTime(tokens[5]);
+                                    fs.defaultValue = Convert.ToDateTime(tokens[5]);
                                 }
                                 break;
                         }
                     }
                     
-                    fs.fieldMatchIndexFlag = Convert.ToBoolean(tokens[2]);
-                    if (fs.fieldMatchIndexFlag)
+                    fs.isMatchIndex = Convert.ToBoolean(tokens[2]);
+                    if (fs.isMatchIndex)
                     {
-                        ts.matchIndexFieldDic.Add(e.Name.ToString(), fs.fieldIndex);
+                        ts.matchIndexFieldDic.Add(e.Name.ToString(), fs.indexNumber);
                     }
 
                     var fieldPrimaryKeyFlag = Convert.ToBoolean(tokens[3]);
@@ -206,13 +206,13 @@ namespace Redisql
                         ts.primaryKeyFieldName = e.Name;
                     }
 
-                    fs.fieldRangeIndexFlag = Convert.ToBoolean(tokens[4]);
-                    if (fs.fieldRangeIndexFlag)
+                    fs.isRangeIndex = Convert.ToBoolean(tokens[4]);
+                    if (fs.isRangeIndex)
                     {
-                        ts.rangeIndexFieldDic.Add(e.Name.ToString(), fs.fieldIndex);
+                        ts.rangeIndexFieldDic.Add(e.Name.ToString(), fs.indexNumber);
                     }
 
-                    ts.fieldIndexNameDic.Add(fs.fieldIndex.ToString(), e.Name.ToString());
+                    ts.fieldIndexNameDic.Add(fs.indexNumber.ToString(), e.Name.ToString());
                     ts.tableSchemaDic.Add(e.Name.ToString(), fs);
                 }
 
@@ -230,7 +230,6 @@ namespace Redisql
                 enterTableLock = true;
                 await TableLockEnterAsync(tableName, "");
 
-                // 테이블을 지울때는 테이블 데이터만 지우고 TableID, 자동 증가값은 지우지 않는다. 다시 생성될때를 대비하기 위함이다.
                 var db = this.redis.GetDatabase();
 
                 var ts = await TableGetSettingAsync(tableName);
@@ -399,7 +398,7 @@ namespace Redisql
                 {
                     return false;
                 }
-                var primaryKeyFieldIndex = fs.fieldIndex;
+                var primaryKeyFieldIndex = fs.indexNumber;
 
                 if (!ts.tableSchemaDic.TryGetValue(fieldName, out fs))
                 {
@@ -413,7 +412,7 @@ namespace Redisql
                 // field에 저장된 값을 먼저 읽는다.
                 var rva = new RedisValue[2];
                 rva[0] = primaryKeyFieldIndex;
-                rva[1] = fs.fieldIndex;
+                rva[1] = fs.indexNumber;
                 foreach (var primaryKeyValue in pvks)
                 {
                     key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
@@ -424,20 +423,20 @@ namespace Redisql
                 foreach (var t in tasklist)
                 {
                     var ret = await t;
-                    if (fs.fieldMatchIndexFlag)
+                    if (fs.isMatchIndex)
                     {
-                        key = GetRedisKey_TableMatchIndexField(ts.tableID, fs.fieldIndex, ret[1].ToString());
+                        key = GetRedisKey_TableMatchIndexField(ts.tableID, fs.indexNumber, ret[1].ToString());
                         tasklist2.Add(db.SetRemoveAsync(key, ret[0].ToString()));
                     }
 
-                    if (fs.fieldRangeIndexFlag)
+                    if (fs.isRangeIndex)
                     {
-                        key = GetRedisKey_TableRangeIndexField(ts.tableID, fs.fieldIndex);
+                        key = GetRedisKey_TableRangeIndexField(ts.tableID, fs.indexNumber);
                         tasklist2.Add(db.SortedSetRemoveAsync(key, ret[0].ToString()));
                     }
 
                     key = GetRedisKey_TableRow(ts.tableID, ret[0].ToString());
-                    tasklist2.Add(db.HashDeleteAsync(key, fs.fieldIndex));
+                    tasklist2.Add(db.HashDeleteAsync(key, fs.indexNumber));
                 }
 
                 foreach (var t in tasklist2)
@@ -447,7 +446,7 @@ namespace Redisql
 
                 // 데이터를 다 지웠으니 테이블 스키마 제거
                 ts.tableSchemaDic.Remove(fieldName);
-                ts.fieldIndexNameDic.Remove(fs.fieldIndex.ToString());
+                ts.fieldIndexNameDic.Remove(fs.indexNumber.ToString());
 
                 Int32 v;
                 if (ts.matchIndexFieldDic.TryGetValue(fieldName, out v))
@@ -500,13 +499,13 @@ namespace Redisql
                 await TableLockEnterAsync(tableName, "");
 
                 var fs = new FieldSetting();
-                fs.fieldIndex = ts.GetNextFieldIndex();
-                fs.fieldType = fieldType;
-                fs.fieldMatchIndexFlag = matchIndexFlag;
-                fs.fieldRangeIndexFlag = rangeIndexFlag;
-                fs.fieldDefaultValue = defaultValue;
+                fs.indexNumber = ts.GetNextFieldIndexNumber();
+                fs.dataType = fieldType;
+                fs.isMatchIndex = matchIndexFlag;
+                fs.isRangeIndex = rangeIndexFlag;
+                fs.defaultValue = defaultValue;
 
-                if (fs.fieldType == typeof(DateTime))
+                if (fs.dataType == typeof(DateTime))
                 {
                     var dvt = defaultValue.ToString().ToLower();
                     if (dvt.Equals("now"))
@@ -523,19 +522,19 @@ namespace Redisql
 
                 if (matchIndexFlag)
                 {
-                    ts.matchIndexFieldDic.Add(fieldName, fs.fieldIndex);
+                    ts.matchIndexFieldDic.Add(fieldName, fs.indexNumber);
                 }
 
                 if (rangeIndexFlag)
                 {
-                    ts.rangeIndexFieldDic.Add(fieldName, fs.fieldIndex);
+                    ts.rangeIndexFieldDic.Add(fieldName, fs.indexNumber);
                 }
 
-                ts.fieldIndexNameDic.Add(fs.fieldIndex.ToString(), fieldName);
+                ts.fieldIndexNameDic.Add(fs.indexNumber.ToString(), fieldName);
 
                 var tableSchemaName = GetRedisKey_TableSchema(tableName);
                 
-                var value = string.Format("{0},{1},{2},{3},{4},{5}", fs.fieldIndex.ToString(), fs.fieldType.ToString(), matchIndexFlag.ToString(), "False", rangeIndexFlag.ToString(), defaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
+                var value = string.Format("{0},{1},{2},{3},{4},{5}", fs.indexNumber.ToString(), fs.dataType.ToString(), matchIndexFlag.ToString(), "False", rangeIndexFlag.ToString(), defaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
                 await db.HashSetAsync(tableSchemaName, fieldName, value);
 
                 // 테이블 스키마 수정 완료되었으니 기존에 존재하는 테이블 아이템에 새로 추가된 field를 defaultValue로 모두 입력한다.
@@ -545,20 +544,20 @@ namespace Redisql
                 foreach (var primaryKeyValue in pvks)
                 {
                     key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
-                    tasklist.Add(db.HashSetAsync(key, fs.fieldIndex.ToString(), defaultValue.ToString()));
+                    tasklist.Add(db.HashSetAsync(key, fs.indexNumber.ToString(), defaultValue.ToString()));
 
                     if (matchIndexFlag)
                     {
                         // make match index
-                        key = GetRedisKey_TableMatchIndexField(ts.tableID, fs.fieldIndex, defaultValue.ToString());
+                        key = GetRedisKey_TableMatchIndexField(ts.tableID, fs.indexNumber, defaultValue.ToString());
                         tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
                     }
 
                     if (rangeIndexFlag)
                     {
                         // make range index
-                        key = GetRedisKey_TableRangeIndexField(ts.tableID, fs.fieldIndex);
-                        var score = ConvertToScore(fs.fieldType, defaultValue.ToString());
+                        key = GetRedisKey_TableRangeIndexField(ts.tableID, fs.indexNumber);
+                        var score = ConvertToScore(fs.dataType, defaultValue.ToString());
                         tasklist.Add(db.SortedSetAddAsync(key, primaryKeyValue, score));
                     }
                 }
@@ -608,7 +607,7 @@ namespace Redisql
                     return false;
                 }
 
-                if (fs.fieldMatchIndexFlag)
+                if (fs.isMatchIndex)
                 {
                     return false; // Already indexed field. No need to add index.
                 }
@@ -616,12 +615,12 @@ namespace Redisql
                 enterTableLock = true;
                 await TableLockEnterAsync(tableName, "");
 
-                fs.fieldMatchIndexFlag = true;
-                ts.matchIndexFieldDic.Add(fieldName, fs.fieldIndex);
+                fs.isMatchIndex = true;
+                ts.matchIndexFieldDic.Add(fieldName, fs.indexNumber);
 
                 var tableSchemaName = GetRedisKey_TableSchema(tableName);
 
-                var value = string.Format("{0},{1},{2},{3},{4},{5}", fs.fieldIndex.ToString(), fs.fieldType.ToString(), fs.fieldMatchIndexFlag.ToString(), "False", fs.fieldRangeIndexFlag.ToString(), fs.fieldDefaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
+                var value = string.Format("{0},{1},{2},{3},{4},{5}", fs.indexNumber.ToString(), fs.dataType.ToString(), fs.isMatchIndex.ToString(), "False", fs.isRangeIndex.ToString(), fs.defaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
                 await db.HashSetAsync(tableSchemaName, fieldName, value);
 
                 // 
@@ -631,10 +630,10 @@ namespace Redisql
                 foreach (var primaryKeyValue in pvks)
                 {
                     key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
-                    var v = await db.HashGetAsync(key, fs.fieldIndex);
+                    var v = await db.HashGetAsync(key, fs.indexNumber);
                     
                     // add index
-                    key = GetRedisKey_TableMatchIndexField(ts.tableID, fs.fieldIndex, v.ToString());
+                    key = GetRedisKey_TableMatchIndexField(ts.tableID, fs.indexNumber, v.ToString());
                     tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
                 }
 
@@ -683,7 +682,7 @@ namespace Redisql
                     return false;
                 }
 
-                if (!fs.fieldMatchIndexFlag)
+                if (!fs.isMatchIndex)
                 {
                     return false; // Not indexed field. Could not remove index.
                 }
@@ -691,12 +690,12 @@ namespace Redisql
                 enterTableLock = true;
                 await TableLockEnterAsync(tableName, "");
 
-                fs.fieldMatchIndexFlag = false;
+                fs.isMatchIndex = false;
                 ts.matchIndexFieldDic.Remove(fieldName);
 
                 var tableSchemaName = GetRedisKey_TableSchema(tableName);
 
-                var value = string.Format("{0},{1},{2},{3},{4},{5}", fs.fieldIndex.ToString(), fs.fieldType.ToString(), fs.fieldMatchIndexFlag.ToString(), "False", fs.fieldRangeIndexFlag.ToString(), fs.fieldDefaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
+                var value = string.Format("{0},{1},{2},{3},{4},{5}", fs.indexNumber.ToString(), fs.dataType.ToString(), fs.isMatchIndex.ToString(), "False", fs.isRangeIndex.ToString(), fs.defaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
                 await db.HashSetAsync(tableSchemaName, fieldName, value);
 
                 // 
@@ -706,10 +705,10 @@ namespace Redisql
                 foreach (var primaryKeyValue in pvks)
                 {
                     key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
-                    var v = await db.HashGetAsync(key, fs.fieldIndex);
+                    var v = await db.HashGetAsync(key, fs.indexNumber);
 
                     // remove index
-                    key = GetRedisKey_TableMatchIndexField(ts.tableID, fs.fieldIndex, v.ToString());
+                    key = GetRedisKey_TableMatchIndexField(ts.tableID, fs.indexNumber, v.ToString());
                     tasklist.Add(db.SetRemoveAsync(key, primaryKeyValue));
                 }
 
@@ -753,7 +752,7 @@ namespace Redisql
                     return false;
                 }
 
-                if (fs.fieldRangeIndexFlag)
+                if (fs.isRangeIndex)
                 {
                     return false; // Already range indexed field. 
                 }
@@ -767,12 +766,12 @@ namespace Redisql
                 enterTableLock = true;
                 await TableLockEnterAsync(tableName, "");
 
-                fs.fieldRangeIndexFlag = true;
-                ts.rangeIndexFieldDic.Add(fieldName, fs.fieldIndex);
+                fs.isRangeIndex = true;
+                ts.rangeIndexFieldDic.Add(fieldName, fs.indexNumber);
 
                 var tableSchemaName = GetRedisKey_TableSchema(tableName);
 
-                var value = string.Format("{0},{1},{2},{3},{4},{5}", fs.fieldIndex.ToString(), fs.fieldType.ToString(), fs.fieldMatchIndexFlag.ToString(), pkFlag.ToString(), fs.fieldRangeIndexFlag.ToString(), fs.fieldDefaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
+                var value = string.Format("{0},{1},{2},{3},{4},{5}", fs.indexNumber.ToString(), fs.dataType.ToString(), fs.isMatchIndex.ToString(), pkFlag.ToString(), fs.isRangeIndex.ToString(), fs.defaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
                 await db.HashSetAsync(tableSchemaName, fieldName, value);
 
                 // 
@@ -782,11 +781,11 @@ namespace Redisql
                 foreach (var primaryKeyValue in pvks)
                 {
                     key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
-                    var v = await db.HashGetAsync(key, fs.fieldIndex);
+                    var v = await db.HashGetAsync(key, fs.indexNumber);
 
                     // add range index
-                    key = GetRedisKey_TableRangeIndexField(ts.tableID, fs.fieldIndex);
-                    var score = ConvertToScore(fs.fieldType, v.ToString());
+                    key = GetRedisKey_TableRangeIndexField(ts.tableID, fs.indexNumber);
+                    var score = ConvertToScore(fs.dataType, v.ToString());
                     tasklist.Add(db.SortedSetAddAsync(key, primaryKeyValue, score));
                 }
 
@@ -830,7 +829,7 @@ namespace Redisql
                     return false;
                 }
 
-                if (!fs.fieldRangeIndexFlag)
+                if (!fs.isRangeIndex)
                 {
                     return false; // Not range indexed field. 
                 }
@@ -844,12 +843,12 @@ namespace Redisql
                 enterTableLock = true;
                 await TableLockEnterAsync(tableName, "");
 
-                fs.fieldRangeIndexFlag = false;
+                fs.isRangeIndex = false;
                 ts.rangeIndexFieldDic.Remove(fieldName);
 
                 var tableSchemaName = GetRedisKey_TableSchema(tableName);
 
-                var value = string.Format("{0},{1},{2},{3},{4},{5}", fs.fieldIndex.ToString(), fs.fieldType.ToString(), fs.fieldMatchIndexFlag.ToString(), pkFlag.ToString(), fs.fieldRangeIndexFlag.ToString(), fs.fieldDefaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
+                var value = string.Format("{0},{1},{2},{3},{4},{5}", fs.indexNumber.ToString(), fs.dataType.ToString(), fs.isMatchIndex.ToString(), pkFlag.ToString(), fs.isRangeIndex.ToString(), fs.defaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
                 await db.HashSetAsync(tableSchemaName, fieldName, value);
 
                 // 
@@ -859,10 +858,10 @@ namespace Redisql
                 foreach (var primaryKeyValue in pvks)
                 {
                     key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
-                    var v = await db.HashGetAsync(key, fs.fieldIndex);
+                    var v = await db.HashGetAsync(key, fs.indexNumber);
 
                     // remove range index
-                    key = GetRedisKey_TableRangeIndexField(ts.tableID, fs.fieldIndex);
+                    key = GetRedisKey_TableRangeIndexField(ts.tableID, fs.indexNumber);
                     tasklist.Add(db.SortedSetRemoveAsync(key, primaryKeyValue));
                 }
 
@@ -943,19 +942,19 @@ namespace Redisql
                         string value;
                         if (fieldValues.TryGetValue(e.Key, out value))
                         {
-                            heArray[arrayIndex++] = new HashEntry(fs.fieldIndex, value);
+                            heArray[arrayIndex++] = new HashEntry(fs.indexNumber, value);
                         }
                         else
                         {
                             // apply default value
-                            if (null == fs.fieldDefaultValue)
+                            if (null == fs.defaultValue)
                             {
                                 // This field has no default value
                                 return -1;
                             }
                             else
                             {
-                                switch (fs.fieldType.ToString())
+                                switch (fs.dataType.ToString())
                                 {
                                     case "System.Byte": 
                                     case "System.Int16":
@@ -964,39 +963,39 @@ namespace Redisql
                                     case "System.UInt32":
                                     case "System.Single":
                                     case "System.Double":
-                                        heArray[arrayIndex++] = new HashEntry(fs.fieldIndex, fs.fieldDefaultValue.ToString());
+                                        heArray[arrayIndex++] = new HashEntry(fs.indexNumber, fs.defaultValue.ToString());
                                         break;
 
                                     case "System.DateTime":
-                                        if (fs.fieldDefaultValue.Equals("now"))
+                                        if (fs.defaultValue.Equals("now"))
                                         {
-                                            heArray[arrayIndex++] = new HashEntry(fs.fieldIndex, DateTime.Now.ToString());
+                                            heArray[arrayIndex++] = new HashEntry(fs.indexNumber, DateTime.Now.ToString());
                                         }
-                                        else if (fs.fieldDefaultValue.Equals("utcnow"))
+                                        else if (fs.defaultValue.Equals("utcnow"))
                                         {
-                                            heArray[arrayIndex++] = new HashEntry(fs.fieldIndex, DateTime.UtcNow.ToString());
+                                            heArray[arrayIndex++] = new HashEntry(fs.indexNumber, DateTime.UtcNow.ToString());
                                         }
                                         else
                                         {
-                                            heArray[arrayIndex++] = new HashEntry(fs.fieldIndex, fs.fieldDefaultValue.ToString());
+                                            heArray[arrayIndex++] = new HashEntry(fs.indexNumber, fs.defaultValue.ToString());
                                         }
                                         break;
                                 }
                             }
                         }
 
-                        if (e.Value.fieldMatchIndexFlag)
+                        if (e.Value.isMatchIndex)
                         {
                             // make index
-                            key = GetRedisKey_TableMatchIndexField(ts.tableID, e.Value.fieldIndex, value);
+                            key = GetRedisKey_TableMatchIndexField(ts.tableID, e.Value.indexNumber, value);
                             tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
                         }
 
-                        if (e.Value.fieldRangeIndexFlag)
+                        if (e.Value.isRangeIndex)
                         {
                             // sorted set index
-                            key = GetRedisKey_TableRangeIndexField(ts.tableID, e.Value.fieldIndex);
-                            var score = ConvertToScore(e.Value.fieldType, value);
+                            key = GetRedisKey_TableRangeIndexField(ts.tableID, e.Value.indexNumber);
+                            var score = ConvertToScore(e.Value.dataType, value);
                             tasklist.Add(db.SortedSetAddAsync(key, primaryKeyValue, score));
                         }
                     }
@@ -1111,7 +1110,7 @@ namespace Redisql
                         {
                             // SortedSet의 Score를 갱신
                             key = GetRedisKey_TableRangeIndexField(ts.tableID, e.Value.Item1);
-                            var score = ConvertToScore(ts.tableSchemaDic[e.Key].fieldType, e.Value.Item2);
+                            var score = ConvertToScore(ts.tableSchemaDic[e.Key].dataType, e.Value.Item2);
                             tasklist.Add(db.SortedSetAddAsync(key, primaryKeyValue, score));
                         }
 
@@ -1126,7 +1125,7 @@ namespace Redisql
                     FieldSetting fs;
                     if (ts.tableSchemaDic.TryGetValue(e.Key, out fs))
                     {
-                        heArray[arrayIndex++] = new HashEntry(fs.fieldIndex, e.Value);
+                        heArray[arrayIndex++] = new HashEntry(fs.indexNumber, e.Value);
                     }
                 }
 
@@ -1258,7 +1257,7 @@ namespace Redisql
                     FieldSetting fs;
                     if (ts.tableSchemaDic.TryGetValue(selectFields[i], out fs))
                     {
-                        rv[i] = fs.fieldIndex.ToString();
+                        rv[i] = fs.indexNumber.ToString();
                     }
                     else
                     {
@@ -1292,7 +1291,7 @@ namespace Redisql
                 return retlist;
             }
             
-            var key = GetRedisKey_TableMatchIndexField(ts.tableID, fs.fieldIndex, fieldValue);
+            var key = GetRedisKey_TableMatchIndexField(ts.tableID, fs.indexNumber, fieldValue);
             var pkvs = await db.SetMembersAsync(key);
             
             if (null == selectFields)
@@ -1330,7 +1329,7 @@ namespace Redisql
                 {
                     if (ts.tableSchemaDic.TryGetValue(selectFields[i], out fs))
                     {
-                        rva[i] = fs.fieldIndex.ToString();
+                        rva[i] = fs.indexNumber.ToString();
                     }
                     else
                     {
@@ -1376,10 +1375,10 @@ namespace Redisql
                 return retlist;
             }
 
-            var lv = ConvertToScore(fs.fieldType, lowValue);
-            var hv = ConvertToScore(fs.fieldType, highValue);
+            var lv = ConvertToScore(fs.dataType, lowValue);
+            var hv = ConvertToScore(fs.dataType, highValue);
 
-            var key = GetRedisKey_TableRangeIndexField(ts.tableID, fs.fieldIndex);
+            var key = GetRedisKey_TableRangeIndexField(ts.tableID, fs.indexNumber);
             var primaryKeyValues = await db.SortedSetRangeByScoreAsync(key, lv, hv);
 
             if (null == selectFields)
@@ -1417,7 +1416,7 @@ namespace Redisql
                 {
                     if (ts.tableSchemaDic.TryGetValue(selectFields[i], out fs))
                     {
-                        rva[i] = fs.fieldIndex.ToString();
+                        rva[i] = fs.indexNumber.ToString();
                     }
                     else
                     {

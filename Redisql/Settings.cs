@@ -8,11 +8,11 @@ namespace Redisql
 {
     public class FieldSetting
     {
-        public Int32 fieldIndex;
-        public Type fieldType;
-        public bool fieldMatchIndexFlag;
-        public bool fieldRangeIndexFlag;
-        public object fieldDefaultValue;
+        public Int32 indexNumber;
+        public Type dataType;
+        public bool isMatchIndex;
+        public bool isRangeIndex;
+        public object defaultValue;
     }
 
     public class TableSetting
@@ -24,15 +24,15 @@ namespace Redisql
         public Dictionary<string, Int32> rangeIndexFieldDic = new Dictionary<string, int>();
         public Dictionary<string, string> fieldIndexNameDic = new Dictionary<string, string>();
 
-        public Int32 GetNextFieldIndex()
+        public Int32 GetNextFieldIndexNumber()
         {
-            Int32 maxFieldIndex = 0;
+            Int32 maxNum = 0;
             foreach (var fs in tableSchemaDic.Values)
             {
-                if (maxFieldIndex < fs.fieldIndex) maxFieldIndex = fs.fieldIndex;
+                if (maxNum < fs.indexNumber) maxNum = fs.indexNumber;
             }
 
-            return maxFieldIndex + 1;
+            return maxNum + 1;
         }
     }
 }
