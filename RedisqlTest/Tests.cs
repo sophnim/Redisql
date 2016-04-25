@@ -75,7 +75,7 @@ namespace RedisqlTest
             //redisql.DeleteTableRow("Account_Table", "jane").Wait();
 
             Console.WriteLine("select _id, name, level from Account_Table where primaryKeyValue == bruce");
-            var task4 = redisql.TableSelectRowByPrimaryKeyFieldMatchAsync(new List<string> { "_id", "name", "level" }, "Account_Table", "bruce");
+            var task4 = redisql.TableSelectRowByPrimaryKeyFieldValueAsync(new List<string> { "_id", "name", "level" }, "Account_Table", "bruce");
             task4.Wait();
             foreach (var e in task4.Result)
             {
@@ -85,7 +85,7 @@ namespace RedisqlTest
             Console.WriteLine();
 
             Console.WriteLine("select name, level from Account_Table where level == 1");
-            var task5 = redisql.TableSelectRowByIndexFieldMatchAsync(new List<string> { "name", "level" }, "Account_Table", "level", "1");
+            var task5 = redisql.TableSelectRowByMatchIndexFieldValueAsync(new List<string> { "name", "level" }, "Account_Table", "level", "1");
             task5.Wait();
             foreach (var dic in task5.Result)
             {
@@ -98,7 +98,7 @@ namespace RedisqlTest
             Console.WriteLine();
 
             Console.WriteLine("select name, level, exp from Account_Table where 0 <= exp <= 300");
-            var task6 = redisql.TableSelectRowBySortFieldRangeAsync(new List<string> { "name", "level", "exp" }, "Account_Table", "exp", "0", "300");
+            var task6 = redisql.TableSelectRowByRangeIndexFieldRangeAsync(new List<string> { "name", "level", "exp" }, "Account_Table", "exp", "0", "300");
             task6.Wait();
             foreach (var dic in task6.Result)
             {
@@ -111,7 +111,7 @@ namespace RedisqlTest
             Console.WriteLine();
 
             Console.WriteLine("select * from Account_Table where 250 <= exp <= 300");
-            var task7 = redisql.TableSelectRowBySortFieldRangeAsync(null, "Account_Table", "exp", "250", "300");
+            var task7 = redisql.TableSelectRowByRangeIndexFieldRangeAsync(null, "Account_Table", "exp", "250", "300");
             task7.Wait();
             foreach (var dic in task7.Result)
             {
@@ -124,7 +124,7 @@ namespace RedisqlTest
             Console.WriteLine();
 
             Console.WriteLine("select name, level from Account_Table where 1 <= level <= 2");
-            var task8 = redisql.TableSelectRowBySortFieldRangeAsync(new List<string> { "name", "level" }, "Account_Table", "level", "1", "2");
+            var task8 = redisql.TableSelectRowByRangeIndexFieldRangeAsync(new List<string> { "name", "level" }, "Account_Table", "level", "1", "2");
             task8.Wait();
             foreach (var dic in task8.Result)
             {
@@ -173,14 +173,14 @@ namespace RedisqlTest
             Console.WriteLine();
             stw.Restart();
 
-            redisql.TableRemoveIndexAsync("Account_Table", "level").Wait();
+            redisql.TableRemoveMatchIndexAsync("Account_Table", "level").Wait();
 
             Console.WriteLine("Remove Index: Total {0}ms", stw.ElapsedMilliseconds);
 
             Console.WriteLine();
             stw.Restart();
 
-            redisql.TableAddIndexAsync("Account_Table", "level").Wait();
+            redisql.TableAddMatchIndexAsync("Account_Table", "level").Wait();
 
             Console.WriteLine("Add Index: Total {0}ms", stw.ElapsedMilliseconds);
 
