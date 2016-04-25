@@ -143,9 +143,9 @@ namespace RedisqlTest
             List<Tuple<string, Type, bool, bool, object>> fieldList = new List<Tuple<string, Type, bool, bool, object>>()
             {
                 new Tuple<string, Type, bool, bool, object>("name", typeof(String), false, false, null), // name is primaryKey field : String type, primarykey no need to index, can not be sorted
-                new Tuple<string, Type, bool, bool, object>("level", typeof(Int32), true, true, null), // level, Int32 type, index required, sort required
-                new Tuple<string, Type, bool, bool, object>("exp", typeof(Int32), false, true, null), // exp, Int32 type, index not required, sort required
-                new Tuple<string, Type, bool, bool, object>("profile", typeof(String), false, false, null) // exp, Int32 type, index not required, sort required
+                new Tuple<string, Type, bool, bool, object>("level", typeof(Int32), true, true, 1), // level, Int32 type, index required, sort required
+                new Tuple<string, Type, bool, bool, object>("exp", typeof(Int32), false, false, 0), // exp, Int32 type, index not required, sort required
+                new Tuple<string, Type, bool, bool, object>("profile", typeof(String), false, false, "") // exp, Int32 type, index not required, sort required
             };
             // Create Table
             redisql.TableCreateAsync("Account_Table", "name", fieldList).Wait();
@@ -169,6 +169,34 @@ namespace RedisqlTest
             Console.WriteLine("Total {0}ms  {1} per 1ms", stw.ElapsedMilliseconds, testCount / stw.ElapsedMilliseconds);
 
             GC.Collect();
+
+            Console.WriteLine();
+            stw.Restart();
+
+            redisql.TableRemoveIndexAsync("Account_Table", "level").Wait();
+
+            Console.WriteLine("Remove Index: Total {0}ms", stw.ElapsedMilliseconds);
+
+            Console.WriteLine();
+            stw.Restart();
+
+            redisql.TableAddIndexAsync("Account_Table", "level").Wait();
+
+            Console.WriteLine("Add Index: Total {0}ms", stw.ElapsedMilliseconds);
+
+            Console.WriteLine();
+            stw.Restart();
+
+            redisql.TableAddRangeIndexAsync("Account_Table", "exp").Wait();
+
+            Console.WriteLine("Add Range Index: Total {0}ms", stw.ElapsedMilliseconds);
+
+            Console.WriteLine();
+            stw.Restart();
+
+            redisql.TableRemoveRangeIndexAsync("Account_Table", "exp").Wait();
+
+            Console.WriteLine("Remove Range Index: Total {0}ms", stw.ElapsedMilliseconds);
 
             Console.WriteLine();
             stw.Restart();

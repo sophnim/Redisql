@@ -590,6 +590,309 @@ namespace Redisql
             }
         }
 
+        // Add index to unindexed existing table field
+        public async Task<bool> TableAddIndexAsync(string tableName, string fieldName)
+        {
+            bool enterTableLock = false;
+            try
+            {
+                var db = this.redis.GetDatabase();
+
+                var ts = await TableGetSettingAsync(tableName);
+                if (null == ts)
+                {
+                    return false;
+                }
+
+                if (ts.primaryKeyFieldName.Equals(fieldName))
+                {
+                    return false; // Can not add index to primary key field
+                }
+
+                FieldSetting fs;
+                if (!ts.tableSchemaDic.TryGetValue(fieldName, out fs))
+                {
+                    return false;
+                }
+
+                if (fs.fieldIndexFlag)
+                {
+                    return false; // Already indexed field. No need to add index.
+                }
+
+                enterTableLock = true;
+                await TableLockEnterAsync(tableName, "");
+
+                fs.fieldIndexFlag = true;
+                ts.indexedFieldDic.Add(fieldName, fs.fieldIndex);
+
+                var tableSchemaName = GetTableSchemaRedisKey(tableName);
+
+                var value = string.Format("{0},{1},{2},{3},{4},{5}", fs.fieldIndex.ToString(), fs.fieldType.ToString(), fs.fieldIndexFlag.ToString(), "False", fs.fieldSortFlag.ToString(), fs.fieldDefaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
+                await db.HashSetAsync(tableSchemaName, fieldName, value);
+
+                // 
+                var tasklist = new List<Task<bool>>();
+                var key = GetTablePrimaryKeyListRedisKey(tableName);
+                var pvks = await db.SetMembersAsync(key);
+                foreach (var primaryKeyValue in pvks)
+                {
+                    key = GetTableRowRedisKey(ts.tableID, primaryKeyValue.ToString());
+                    var v = await db.HashGetAsync(key, fs.fieldIndex);
+                    
+                    // add index
+                    key = GetTableFieldIndexRedisKey(ts.tableID, fs.fieldIndex, v.ToString());
+                    tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
+                }
+
+                foreach (var t in tasklist)
+                {
+                    if (!await t) return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
+            finally
+            {
+                if (enterTableLock)
+                {
+                    TableLockExit(tableName, "");
+                }
+            }
+        }
+
+        // Make index to unindexed existing table field
+        public async Task<bool> TableRemoveIndexAsync(string tableName, string fieldName)
+        {
+            bool enterTableLock = false;
+            try
+            {
+                var db = this.redis.GetDatabase();
+
+                var ts = await TableGetSettingAsync(tableName);
+                if (null == ts)
+                {
+                    return false;
+                }
+
+                if (ts.primaryKeyFieldName.Equals(fieldName))
+                {
+                    return false; // Can not remove index to primary key field
+                }
+
+                FieldSetting fs;
+                if (!ts.tableSchemaDic.TryGetValue(fieldName, out fs))
+                {
+                    return false;
+                }
+
+                if (!fs.fieldIndexFlag)
+                {
+                    return false; // Not indexed field. Could not remove index.
+                }
+
+                enterTableLock = true;
+                await TableLockEnterAsync(tableName, "");
+
+                fs.fieldIndexFlag = false;
+                ts.indexedFieldDic.Remove(fieldName);
+
+                var tableSchemaName = GetTableSchemaRedisKey(tableName);
+
+                var value = string.Format("{0},{1},{2},{3},{4},{5}", fs.fieldIndex.ToString(), fs.fieldType.ToString(), fs.fieldIndexFlag.ToString(), "False", fs.fieldSortFlag.ToString(), fs.fieldDefaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
+                await db.HashSetAsync(tableSchemaName, fieldName, value);
+
+                // 
+                var tasklist = new List<Task<bool>>();
+                var key = GetTablePrimaryKeyListRedisKey(tableName);
+                var pvks = await db.SetMembersAsync(key);
+                foreach (var primaryKeyValue in pvks)
+                {
+                    key = GetTableRowRedisKey(ts.tableID, primaryKeyValue.ToString());
+                    var v = await db.HashGetAsync(key, fs.fieldIndex);
+
+                    // remove index
+                    key = GetTableFieldIndexRedisKey(ts.tableID, fs.fieldIndex, v.ToString());
+                    tasklist.Add(db.SetRemoveAsync(key, primaryKeyValue));
+                }
+
+                foreach (var t in tasklist)
+                {
+                    if (!await t) return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
+            finally
+            {
+                if (enterTableLock)
+                {
+                    TableLockExit(tableName, "");
+                }
+            }
+        }
+
+        // Add range index to not sort-indexed existing table field
+        public async Task<bool> TableAddRangeIndexAsync(string tableName, string fieldName)
+        {
+            bool enterTableLock = false;
+            try
+            {
+                var db = this.redis.GetDatabase();
+
+                var ts = await TableGetSettingAsync(tableName);
+                if (null == ts)
+                {
+                    return false;
+                }
+
+                FieldSetting fs;
+                if (!ts.tableSchemaDic.TryGetValue(fieldName, out fs))
+                {
+                    return false;
+                }
+
+                if (fs.fieldSortFlag)
+                {
+                    return false; // Already range indexed field. 
+                }
+
+                bool pkFlag = false;
+                if (ts.primaryKeyFieldName.Equals(fieldName))
+                {
+                    pkFlag = true;
+                }
+
+                enterTableLock = true;
+                await TableLockEnterAsync(tableName, "");
+
+                fs.fieldSortFlag = true;
+                ts.sortedFieldDic.Add(fieldName, fs.fieldIndex);
+
+                var tableSchemaName = GetTableSchemaRedisKey(tableName);
+
+                var value = string.Format("{0},{1},{2},{3},{4},{5}", fs.fieldIndex.ToString(), fs.fieldType.ToString(), fs.fieldIndexFlag.ToString(), pkFlag.ToString(), fs.fieldSortFlag.ToString(), fs.fieldDefaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
+                await db.HashSetAsync(tableSchemaName, fieldName, value);
+
+                // 
+                var tasklist = new List<Task<bool>>();
+                var key = GetTablePrimaryKeyListRedisKey(tableName);
+                var pvks = await db.SetMembersAsync(key);
+                foreach (var primaryKeyValue in pvks)
+                {
+                    key = GetTableRowRedisKey(ts.tableID, primaryKeyValue.ToString());
+                    var v = await db.HashGetAsync(key, fs.fieldIndex);
+
+                    // add range index
+                    key = GetTableFieldSortedSetIndexRedisKey(ts.tableID, fs.fieldIndex);
+                    var score = ConvertToScore(fs.fieldType, v.ToString());
+                    tasklist.Add(db.SortedSetAddAsync(key, primaryKeyValue, score));
+                }
+
+                foreach (var t in tasklist)
+                {
+                    if (!await t) return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
+            finally
+            {
+                if (enterTableLock)
+                {
+                    TableLockExit(tableName, "");
+                }
+            }
+        }
+
+        // Remove range index to range indexed existing table field
+        public async Task<bool> TableRemoveRangeIndexAsync(string tableName, string fieldName)
+        {
+            bool enterTableLock = false;
+            try
+            {
+                var db = this.redis.GetDatabase();
+
+                var ts = await TableGetSettingAsync(tableName);
+                if (null == ts)
+                {
+                    return false;
+                }
+
+                FieldSetting fs;
+                if (!ts.tableSchemaDic.TryGetValue(fieldName, out fs))
+                {
+                    return false;
+                }
+
+                if (!fs.fieldSortFlag)
+                {
+                    return false; // Not range indexed field. 
+                }
+
+                bool pkFlag = false;
+                if (ts.primaryKeyFieldName.Equals(fieldName))
+                {
+                    pkFlag = true;
+                }
+
+                enterTableLock = true;
+                await TableLockEnterAsync(tableName, "");
+
+                fs.fieldSortFlag = false;
+                ts.sortedFieldDic.Remove(fieldName);
+
+                var tableSchemaName = GetTableSchemaRedisKey(tableName);
+
+                var value = string.Format("{0},{1},{2},{3},{4},{5}", fs.fieldIndex.ToString(), fs.fieldType.ToString(), fs.fieldIndexFlag.ToString(), pkFlag.ToString(), fs.fieldSortFlag.ToString(), fs.fieldDefaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
+                await db.HashSetAsync(tableSchemaName, fieldName, value);
+
+                // 
+                var tasklist = new List<Task<bool>>();
+                var key = GetTablePrimaryKeyListRedisKey(tableName);
+                var pvks = await db.SetMembersAsync(key);
+                foreach (var primaryKeyValue in pvks)
+                {
+                    key = GetTableRowRedisKey(ts.tableID, primaryKeyValue.ToString());
+                    var v = await db.HashGetAsync(key, fs.fieldIndex);
+
+                    // remove range index
+                    key = GetTableFieldSortedSetIndexRedisKey(ts.tableID, fs.fieldIndex);
+                    tasklist.Add(db.SortedSetRemoveAsync(key, primaryKeyValue));
+                }
+
+                foreach (var t in tasklist)
+                {
+                    if (!await t) return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
+            finally
+            {
+                if (enterTableLock)
+                {
+                    TableLockExit(tableName, "");
+                }
+            }
+        }
+
         private Double ConvertToScore(Type type, string value)
         {
             switch (type.ToString())
