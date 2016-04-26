@@ -6,30 +6,31 @@ using System.Threading.Tasks;
 
 namespace Redisql
 {
-    public class FieldSetting
+    public class ColumnSetting
     {
-        public Int32 indexNumber;
-        public Type dataType;
-        public bool isMatchIndex;
-        public bool isRangeIndex;
-        public object defaultValue;
+        internal Int32 indexNumber;
+        internal Type dataType;
+        internal bool isMatchIndex;
+        internal bool isRangeIndex;
+        internal object defaultValue;
     }
 
     public class TableSetting
     {
-        public int tableID;
-        public string primaryKeyFieldName;
-        public Dictionary<string, FieldSetting> tableSchemaDic = new Dictionary<string, FieldSetting>();
-        public Dictionary<string, Int32> matchIndexFieldDic = new Dictionary<string, int>();
-        public Dictionary<string, Int32> rangeIndexFieldDic = new Dictionary<string, int>();
-        public Dictionary<string, string> fieldIndexNameDic = new Dictionary<string, string>();
+        public int tableID { get; internal set; }
+        public string primaryKeyColumnName { get; internal set; }
+        public Dictionary<string, ColumnSetting> tableSchemaDic { get; internal set; } = new Dictionary<string, ColumnSetting>();
 
-        public Int32 GetNextFieldIndexNumber()
+        internal Dictionary<string, Int32> matchIndexColumnDic = new Dictionary<string, int>();
+        internal Dictionary<string, Int32> rangeIndexColumnDic = new Dictionary<string, int>();
+        internal Dictionary<string, string> columnIndexNameDic = new Dictionary<string, string>();
+
+        internal Int32 GetNextColumnIndexNumber()
         {
             Int32 maxNum = 0;
-            foreach (var fs in tableSchemaDic.Values)
+            foreach (var cs in tableSchemaDic.Values)
             {
-                if (maxNum < fs.indexNumber) maxNum = fs.indexNumber;
+                if (maxNum < cs.indexNumber) maxNum = cs.indexNumber;
             }
 
             return maxNum + 1;

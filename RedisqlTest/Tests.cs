@@ -13,7 +13,11 @@ namespace RedisqlTest
     {
         public void Test1()
         {
-            Redisql.Redisql redisql = new Redisql.Redisql("192.168.25.5", 6379, "");
+            Redisql.Redisql redisql = new Redisql.Redisql("127.0.0.1", 6379, "");
+
+            var task0 = redisql.TableGetSettingAsync("Account_Table");
+            task0.Wait();
+            var ts = task0.Result;
 
             List<Tuple<string, Type, bool, bool, object>> fieldList = new List<Tuple<string, Type, bool, bool, object>>()
             {
@@ -138,7 +142,7 @@ namespace RedisqlTest
 
         public void Test2()
         {
-            Redisql.Redisql redisql = new Redisql.Redisql("192.168.25.5", 6379, "");
+            Redisql.Redisql redisql = new Redisql.Redisql("127.0.0.1", 6379, "");
 
             List<Tuple<string, Type, bool, bool, object>> fieldList = new List<Tuple<string, Type, bool, bool, object>>()
             {
