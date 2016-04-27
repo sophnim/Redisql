@@ -38,12 +38,12 @@ namespace Redisql
             return string.Format("C:{0}", tableName);
         }
 
-        private string GetRedisKey_TableMatchIndexField(Int32 tableID, Int32 columnIndex, string value)
+        private string GetRedisKey_TableMatchIndexColumn(Int32 tableID, Int32 columnIndex, string value)
         {
             return string.Format("I:{0}:{1}:{2}", tableID.ToString(), columnIndex.ToString(), value);
         }
 
-        private string GetRedisKey_TableRangeIndexField(Int32 tableID, Int32 columnIndex)
+        private string GetRedisKey_TableRangeIndexColumn(Int32 tableID, Int32 columnIndex)
         {
             return string.Format("S:{0}:{1}", tableID.ToString(), columnIndex.ToString());
         }
@@ -425,13 +425,13 @@ namespace Redisql
                     var ret = await t;
                     if (cs.isMatchIndex)
                     {
-                        key = GetRedisKey_TableMatchIndexField(ts.tableID, cs.indexNumber, ret[1].ToString());
+                        key = GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, ret[1].ToString());
                         tasklist2.Add(db.SetRemoveAsync(key, ret[0].ToString()));
                     }
 
                     if (cs.isRangeIndex)
                     {
-                        key = GetRedisKey_TableRangeIndexField(ts.tableID, cs.indexNumber);
+                        key = GetRedisKey_TableRangeIndexColumn(ts.tableID, cs.indexNumber);
                         tasklist2.Add(db.SortedSetRemoveAsync(key, ret[0].ToString()));
                     }
 
@@ -549,14 +549,14 @@ namespace Redisql
                     if (matchIndexFlag)
                     {
                         // make match index
-                        key = GetRedisKey_TableMatchIndexField(ts.tableID, cs.indexNumber, defaultValue.ToString());
+                        key = GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, defaultValue.ToString());
                         tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
                     }
 
                     if (rangeIndexFlag)
                     {
                         // make range index
-                        key = GetRedisKey_TableRangeIndexField(ts.tableID, cs.indexNumber);
+                        key = GetRedisKey_TableRangeIndexColumn(ts.tableID, cs.indexNumber);
                         var score = ConvertToScore(cs.dataType, defaultValue.ToString());
                         tasklist.Add(db.SortedSetAddAsync(key, primaryKeyValue, score));
                     }
@@ -633,7 +633,7 @@ namespace Redisql
                     var v = await db.HashGetAsync(key, cs.indexNumber);
                     
                     // add index
-                    key = GetRedisKey_TableMatchIndexField(ts.tableID, cs.indexNumber, v.ToString());
+                    key = GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, v.ToString());
                     tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
                 }
 
@@ -708,7 +708,7 @@ namespace Redisql
                     var v = await db.HashGetAsync(key, cs.indexNumber);
 
                     // remove index
-                    key = GetRedisKey_TableMatchIndexField(ts.tableID, cs.indexNumber, v.ToString());
+                    key = GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, v.ToString());
                     tasklist.Add(db.SetRemoveAsync(key, primaryKeyValue));
                 }
 
@@ -784,7 +784,7 @@ namespace Redisql
                     var v = await db.HashGetAsync(key, cs.indexNumber);
 
                     // add range index
-                    key = GetRedisKey_TableRangeIndexField(ts.tableID, cs.indexNumber);
+                    key = GetRedisKey_TableRangeIndexColumn(ts.tableID, cs.indexNumber);
                     var score = ConvertToScore(cs.dataType, v.ToString());
                     tasklist.Add(db.SortedSetAddAsync(key, primaryKeyValue, score));
                 }
@@ -861,7 +861,7 @@ namespace Redisql
                     var v = await db.HashGetAsync(key, cs.indexNumber);
 
                     // remove range index
-                    key = GetRedisKey_TableRangeIndexField(ts.tableID, cs.indexNumber);
+                    key = GetRedisKey_TableRangeIndexColumn(ts.tableID, cs.indexNumber);
                     tasklist.Add(db.SortedSetRemoveAsync(key, primaryKeyValue));
                 }
 
@@ -987,14 +987,14 @@ namespace Redisql
                         if (e.Value.isMatchIndex)
                         {
                             // make index
-                            key = GetRedisKey_TableMatchIndexField(ts.tableID, e.Value.indexNumber, value);
+                            key = GetRedisKey_TableMatchIndexColumn(ts.tableID, e.Value.indexNumber, value);
                             tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
                         }
 
                         if (e.Value.isRangeIndex)
                         {
                             // sorted set index
-                            key = GetRedisKey_TableRangeIndexField(ts.tableID, e.Value.indexNumber);
+                            key = GetRedisKey_TableRangeIndexColumn(ts.tableID, e.Value.indexNumber);
                             var score = ConvertToScore(e.Value.dataType, value);
                             tasklist.Add(db.SortedSetAddAsync(key, primaryKeyValue, score));
                         }
@@ -1099,17 +1099,17 @@ namespace Redisql
                         if (ts.matchIndexColumnDic.ContainsKey(e.Key))
                         {
                             // 원래 값으로 저장되어 있던 인덱스를 지우고 새 값으로 갱신
-                            key = GetRedisKey_TableMatchIndexField(ts.tableID, e.Value.Item1, ret[index].ToString());
+                            key = GetRedisKey_TableMatchIndexColumn(ts.tableID, e.Value.Item1, ret[index].ToString());
                             tasklist.Add(db.SetRemoveAsync(key, primaryKeyValue));
 
-                            key = GetRedisKey_TableMatchIndexField(ts.tableID, e.Value.Item1, e.Value.Item2);
+                            key = GetRedisKey_TableMatchIndexColumn(ts.tableID, e.Value.Item1, e.Value.Item2);
                             tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
                         }
 
                         if (ts.rangeIndexColumnDic.ContainsKey(e.Key))
                         {
                             // SortedSet의 Score를 갱신
-                            key = GetRedisKey_TableRangeIndexField(ts.tableID, e.Value.Item1);
+                            key = GetRedisKey_TableRangeIndexColumn(ts.tableID, e.Value.Item1);
                             var score = ConvertToScore(ts.tableSchemaDic[e.Key].dataType, e.Value.Item2);
                             tasklist.Add(db.SortedSetAddAsync(key, primaryKeyValue, score));
                         }
@@ -1185,14 +1185,14 @@ namespace Redisql
                 // 인덱스 삭제
                 foreach (var fieldIndex in ts.matchIndexColumnDic.Values)
                 {
-                    key = GetRedisKey_TableMatchIndexField(ts.tableID, fieldIndex, fvdic[fieldIndex.ToString()]); 
+                    key = GetRedisKey_TableMatchIndexColumn(ts.tableID, fieldIndex, fvdic[fieldIndex.ToString()]); 
                     tasklist.Add(db.SetRemoveAsync(key, primaryKeyValue));
                 }
 
                 // sortedset 삭제
                 foreach (var e in ts.rangeIndexColumnDic)
                 {
-                    key = GetRedisKey_TableRangeIndexField(ts.tableID, e.Value);
+                    key = GetRedisKey_TableRangeIndexColumn(ts.tableID, e.Value);
                     tasklist.Add(db.SortedSetRemoveAsync(key, primaryKeyValue));
                 }
 
@@ -1291,7 +1291,7 @@ namespace Redisql
                 return retlist;
             }
             
-            var key = GetRedisKey_TableMatchIndexField(ts.tableID, cs.indexNumber, fieldValue);
+            var key = GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, fieldValue);
             var pkvs = await db.SetMembersAsync(key);
             
             if (null == selectColumnNames)
@@ -1378,7 +1378,7 @@ namespace Redisql
             var lv = ConvertToScore(cs.dataType, lowValue);
             var hv = ConvertToScore(cs.dataType, highValue);
 
-            var key = GetRedisKey_TableRangeIndexField(ts.tableID, cs.indexNumber);
+            var key = GetRedisKey_TableRangeIndexColumn(ts.tableID, cs.indexNumber);
             var primaryKeyValues = await db.SortedSetRangeByScoreAsync(key, lv, hv);
 
             if (null == selectColumnNames)
