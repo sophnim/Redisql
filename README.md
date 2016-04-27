@@ -4,7 +4,7 @@ Redis에 데이터를 읽고 쓸때 SQL 테이블처럼 할수 있게 만들어�
 
 Redisql 인스턴스를 생성합니다:
 
-    Redisql redisql = new Redisql.Redisql("127.0.0.1", 6379, "foobared"); // redis ip, port, password
+    Redisql redisql = new Redisql("127.0.0.1", 6379, "foobared"); // redis ip, port, password
 
 테이블 구조를 정의한 후 테이블을 생성합니다.
 
@@ -16,10 +16,22 @@ Redisql 인스턴스를 생성합니다:
         new Tuple<string, Type, bool, bool, object>("gender", typeof(Int32), false, false, 0), 
         new Tuple<string, Type, bool, bool, object>("birthdate", typeof(DateTime), false, false, "now") 
     };
+    
     // 테이블을 생성합니다. 이때 테이블의 PrimaryKey는 'name' column으로 지정했습니다.
     redisql.TableCreate("Member_Table", "name", columnList);
 
 테이블 행(row)단위로 데이터를 입력합니다.
+
+    // 테이블에 입력할 row의 정보를 작성합니다. Dictionary<string,string>에 컬럼이름, 컬럼값을 입력합니다.
+    var rowInfo = new Dictionary<string, string>() {
+        { "name", string.Format("bruce{0}", i) },
+        { "level", i.ToString() },
+        { "exp", "100" },
+        { "profile", "this is test account" }
+    };
+    
+    // 작성한 row정보로 TableRowInsert를 호출해서 row를 테이블에 입력합니다.
+    redisql.TableRowInsert("Member_Table", rowInfo);
 
 테이블에 입력된 여러개의 row중에 
 
