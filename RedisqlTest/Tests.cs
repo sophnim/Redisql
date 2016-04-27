@@ -205,22 +205,22 @@ namespace RedisqlTest
             Console.WriteLine();
             stw.Restart();
 
-            redisql.TableAddNewFieldAsync("Account_Table", "age", typeof(Int32), true, true, 1).Wait();
+            redisql.TableCreateNewColumnAsync("Account_Table", "age", typeof(Int32), true, true, 1).Wait();
 
             Console.WriteLine("Add New Field: Total {0}ms", stw.ElapsedMilliseconds);
 
             Console.WriteLine();
             stw.Restart();
 
-            redisql.TableEraseExistingFieldAsync("Account_Table", "age").Wait();
-            redisql.TableEraseExistingFieldAsync("Account_Table", "exp").Wait();
+            redisql.TableDeleteExistingColumnAsync("Account_Table", "age").Wait();
+            redisql.TableDeleteExistingColumnAsync("Account_Table", "exp").Wait();
 
             Console.WriteLine("Erase Existing Field: Total {0}ms", stw.ElapsedMilliseconds);
 
             Console.WriteLine();
             stw.Restart();
 
-            redisql.TableAddNewFieldAsync("Account_Table", "time", typeof(DateTime), true, true, "now").Wait();
+            redisql.TableCreateNewColumnAsync("Account_Table", "time", typeof(DateTime), true, true, "now").Wait();
 
             Console.WriteLine("Re-Add New Field: Total {0}ms", stw.ElapsedMilliseconds);
 
