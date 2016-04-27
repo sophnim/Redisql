@@ -8,7 +8,7 @@ Redisql 인스턴스를 생성합니다:
 
 테이블 구조를 정의한 후 테이블을 생성합니다.
 
-    // 테이블 생성을 위해 필요한 파라미터 정보를 작성합니다. 
+    // 테이블 생성을 위해 필요한 컬럼 정보를 작성합니다. 
     var columnList = new List<Tuple<string, Type, bool, bool, object>>() // column name, type, make matchIndex, make rangeIndex, defaultValue
     {
         new Tuple<string, Type, bool, bool, object>("name", typeof(String), false, false, null), 
@@ -42,6 +42,10 @@ TableRowSelectByPrimaryKeyColumnValue 함수를 호출할때 첫번째 파라미
 
     var selectColumnNames = new List<string>() { "name", "age", "birthdate" };
     var row = redisql.TableRowSelectByPrimaryKeyColumnValue(selectColumnNames, "Member_Table", "John Smith");
+
+테이블에 입력된 row의 값을 Update할 수 있습니다:
+
+    redisql.TableRowUpdate("Member_Table", Dictionary<string, string> updateColumnNameValuePairs)
 
 Redis에 대한 접근은 Stackexchange.Redis를 사용하며 Redis의 자료구조인 Hash, Set, SortedSet, String을 사용해서 구현되었습니다.
 
