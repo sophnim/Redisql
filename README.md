@@ -13,7 +13,7 @@ Redisql 인스턴스를 생성합니다:
     {
         new Tuple<string, Type, bool, bool, object>("name", typeof(String), false, false, null), 
         new Tuple<string, Type, bool, bool, object>("age", typeof(Int32), true, true, 1), 
-        new Tuple<string, Type, bool, bool, object>("gender", typeof(Int32), false, false, 0), 
+        new Tuple<string, Type, bool, bool, object>("class", typeof(Int32), false, false, 0), 
         new Tuple<string, Type, bool, bool, object>("birthdate", typeof(DateTime), false, false, "now") 
     };
     
@@ -24,16 +24,18 @@ Redisql 인스턴스를 생성합니다:
 
     // 테이블에 입력할 row의 정보를 작성합니다. Dictionary<string,string>에 컬럼이름, 컬럼값을 입력합니다.
     var rowInfo = new Dictionary<string, string>() {
-        { "name", string.Format("bruce{0}", i) },
-        { "level", i.ToString() },
-        { "exp", "100" },
-        { "profile", "this is test account" }
+        { "name", "John Smith" },
+        { "age", "43" },
+        { "class", "1" },
+        { "birthdate", DateTime.Now.ToString() }
     };
     
-    // 작성한 row정보로 TableRowInsert를 호출해서 row를 테이블에 입력합니다.
+    // TableRowInsert를 호출해서 row를 테이블에 입력합니다.
     redisql.TableRowInsert("Member_Table", rowInfo);
 
-테이블에 입력된 여러개의 row중에 
+
+
+
 
 Redis에 대한 접근은 Stackexchange.Redis를 사용하며 Redis의 자료구조인 Hash, Set, SortedSet, String을 사용해서 구현되었습니다.
 
