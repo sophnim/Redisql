@@ -118,6 +118,11 @@ namespace Redisql
             return true;
         }
 
+        private T WaitTaskAndReturnTaskResult<T>(Task<T> task)
+        {
+            task.Wait();
+            return task.Result;
+        }
 
         public async Task<TableSetting> TableGetSettingAsync(string tableName)
         {
