@@ -14,8 +14,8 @@ namespace Redisql
 
     public partial class Redisql
     {
-        ConcurrentDictionary<string, TableSetting> tableSettingDic = new ConcurrentDictionary<string, TableSetting>();
-        ConnectionMultiplexer redis;
+        private ConcurrentDictionary<string, TableSetting> tableSettingDic = new ConcurrentDictionary<string, TableSetting>();
+        private ConnectionMultiplexer redis;
 
         public Redisql(string redisIp, Int32 redisPort, string redisPassword)
         {

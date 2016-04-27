@@ -34,7 +34,7 @@ namespace Redisql
 
                 if (cs.isRangeIndex)
                 {
-                    return false; // Already range indexed field. 
+                    return false; // Already range indexed column. 
                 }
 
                 bool pkFlag = false;
@@ -89,7 +89,7 @@ namespace Redisql
             }
         }
 
-        // Remove range index to range indexed existing table field
+        // Remove range index to range indexed existing table column
         public async Task<bool> TableRemoveRangeIndexAsync(string tableName, string columnName)
         {
             bool enterTableLock = false;
@@ -111,7 +111,7 @@ namespace Redisql
 
                 if (!cs.isRangeIndex)
                 {
-                    return false; // Not range indexed field. 
+                    return false; // Not range indexed column. 
                 }
 
                 bool pkFlag = false;

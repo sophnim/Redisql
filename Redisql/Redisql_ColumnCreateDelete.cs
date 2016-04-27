@@ -12,6 +12,111 @@ namespace Redisql
 {
     public partial class Redisql
     {
+        public async Task<bool> TableCreateNewColumnAsync(string tableName, string columnName, Type columnType, bool makeMatchIndex, bool makeRangeIndex, object defaultValue)
+        {
+            bool enterTableLock = false;
+            try
+            {
+                if (defaultValue == null)
+                {
+                    return false;
+                }
+
+                var db = this.redis.GetDatabase();
+
+                var ts = await TableGetSettingAsync(tableName);
+                if (null == ts)
+                {
+                    return false;
+                }
+
+                enterTableLock = true;
+                await TableLockEnterAsync(tableName, "");
+
+                var cs = new ColumnSetting();
+                cs.indexNumber = ts.GetNextColumnIndexNumber();
+                cs.dataType = columnType;
+                cs.isMatchIndex = makeMatchIndex;
+                cs.isRangeIndex = makeRangeIndex;
+                cs.defaultValue = defaultValue;
+
+                if (cs.dataType == typeof(DateTime))
+                {
+                    var dvt = defaultValue.ToString().ToLower();
+                    if (dvt.Equals("now"))
+                    {
+                        defaultValue = DateTime.Now.ToString();
+                    }
+                    else if (dvt.Equals("utcnow"))
+                    {
+                        defaultValue = DateTime.UtcNow.ToString();
+                    }
+                }
+
+                ts.tableSchemaDic.Add(columnName, cs);
+
+                if (makeMatchIndex)
+                {
+                    ts.matchIndexColumnDic.Add(columnName, cs.indexNumber);
+                }
+
+                if (makeRangeIndex)
+                {
+                    ts.rangeIndexColumnDic.Add(columnName, cs.indexNumber);
+                }
+
+                ts.columnIndexNameDic.Add(cs.indexNumber.ToString(), columnName);
+
+                var tableSchemaName = GetRedisKey_TableSchema(tableName);
+
+                var value = string.Format("{0},{1},{2},{3},{4},{5}", cs.indexNumber.ToString(), cs.dataType.ToString(), makeMatchIndex.ToString(), "False", makeRangeIndex.ToString(), defaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
+                await db.HashSetAsync(tableSchemaName, columnName, value);
+
+                // 테이블 스키마 수정 완료되었으니 기존에 존재하는 테이블 아이템에 새로 추가된 field를 defaultValue로 모두 입력한다.
+                var tasklist = new List<Task<bool>>();
+                var key = GetRedisKey_TablePrimaryKeyList(tableName);
+                var pvks = await db.SetMembersAsync(key);
+                foreach (var primaryKeyValue in pvks)
+                {
+                    key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
+                    tasklist.Add(db.HashSetAsync(key, cs.indexNumber.ToString(), defaultValue.ToString()));
+
+                    if (makeMatchIndex)
+                    {
+                        // make match index
+                        key = GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, defaultValue.ToString());
+                        tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
+                    }
+
+                    if (makeRangeIndex)
+                    {
+                        // make range index
+                        key = GetRedisKey_TableRangeIndexColumn(ts.tableID, cs.indexNumber);
+                        var score = ConvertToScore(cs.dataType, defaultValue.ToString());
+                        tasklist.Add(db.SortedSetAddAsync(key, primaryKeyValue, score));
+                    }
+                }
+
+                foreach (var t in tasklist)
+                {
+                    if (!await t) return false;
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
+            finally
+            {
+                if (enterTableLock)
+                {
+                    TableLockExit(tableName, "");
+                }
+            }
+        }
+
         public async Task<bool> TableDeleteExistingColumnAsync(string tableName, string columnName)
         {
             bool enterTableLock = false;
@@ -101,111 +206,6 @@ namespace Redisql
 
                 key = GetRedisKey_TableSchema(tableName);
                 await db.HashDeleteAsync(key, columnName);
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                return false;
-            }
-            finally
-            {
-                if (enterTableLock)
-                {
-                    TableLockExit(tableName, "");
-                }
-            }
-        }
-
-        public async Task<bool> TableCreateNewColumnAsync(string tableName, string columnName, Type columnType, bool matchIndexFlag, bool rangeIndexFlag, object defaultValue)
-        {
-            bool enterTableLock = false;
-            try
-            {
-                if (defaultValue == null)
-                {
-                    return false;
-                }
-
-                var db = this.redis.GetDatabase();
-
-                var ts = await TableGetSettingAsync(tableName);
-                if (null == ts)
-                {
-                    return false;
-                }
-
-                enterTableLock = true;
-                await TableLockEnterAsync(tableName, "");
-
-                var cs = new ColumnSetting();
-                cs.indexNumber = ts.GetNextColumnIndexNumber();
-                cs.dataType = columnType;
-                cs.isMatchIndex = matchIndexFlag;
-                cs.isRangeIndex = rangeIndexFlag;
-                cs.defaultValue = defaultValue;
-
-                if (cs.dataType == typeof(DateTime))
-                {
-                    var dvt = defaultValue.ToString().ToLower();
-                    if (dvt.Equals("now"))
-                    {
-                        defaultValue = DateTime.Now.ToString();
-                    }
-                    else if (dvt.Equals("utcnow"))
-                    {
-                        defaultValue = DateTime.UtcNow.ToString();
-                    }
-                }
-
-                ts.tableSchemaDic.Add(columnName, cs);
-
-                if (matchIndexFlag)
-                {
-                    ts.matchIndexColumnDic.Add(columnName, cs.indexNumber);
-                }
-
-                if (rangeIndexFlag)
-                {
-                    ts.rangeIndexColumnDic.Add(columnName, cs.indexNumber);
-                }
-
-                ts.columnIndexNameDic.Add(cs.indexNumber.ToString(), columnName);
-
-                var tableSchemaName = GetRedisKey_TableSchema(tableName);
-
-                var value = string.Format("{0},{1},{2},{3},{4},{5}", cs.indexNumber.ToString(), cs.dataType.ToString(), matchIndexFlag.ToString(), "False", rangeIndexFlag.ToString(), defaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
-                await db.HashSetAsync(tableSchemaName, columnName, value);
-
-                // 테이블 스키마 수정 완료되었으니 기존에 존재하는 테이블 아이템에 새로 추가된 field를 defaultValue로 모두 입력한다.
-                var tasklist = new List<Task<bool>>();
-                var key = GetRedisKey_TablePrimaryKeyList(tableName);
-                var pvks = await db.SetMembersAsync(key);
-                foreach (var primaryKeyValue in pvks)
-                {
-                    key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
-                    tasklist.Add(db.HashSetAsync(key, cs.indexNumber.ToString(), defaultValue.ToString()));
-
-                    if (matchIndexFlag)
-                    {
-                        // make match index
-                        key = GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, defaultValue.ToString());
-                        tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
-                    }
-
-                    if (rangeIndexFlag)
-                    {
-                        // make range index
-                        key = GetRedisKey_TableRangeIndexColumn(ts.tableID, cs.indexNumber);
-                        var score = ConvertToScore(cs.dataType, defaultValue.ToString());
-                        tasklist.Add(db.SortedSetAddAsync(key, primaryKeyValue, score));
-                    }
-                }
-
-                foreach (var t in tasklist)
-                {
-                    if (!await t) return false;
-                }
 
                 return true;
             }

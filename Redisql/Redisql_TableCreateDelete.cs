@@ -35,7 +35,7 @@ namespace Redisql
                 var pkvs = await db.SetMembersAsync(key);
                 foreach (var primaryKeyValue in pkvs)
                 {
-                    tasklist.Add(TableDeleteRowAsync(tableName, primaryKeyValue.ToString()));
+                    tasklist.Add(TableRowDeleteAsync(tableName, primaryKeyValue.ToString()));
                 }
 
                 // 테이블 스키마 삭제
@@ -72,8 +72,8 @@ namespace Redisql
             }
         }
 
-        // List<Tuple<string,Type,bool,bool,object>> fieldList : columnName, columnType, matchIndexFlag, rangeIndexFlag, defaultValue
-        public async Task<bool> TableCreateAsync(string tableName, string primaryKeyFieldName, List<Tuple<string, Type, bool, bool, object>> columnInfoList)
+        // List<Tuple<string,Type,bool,bool,object>> column list : columnName, columnType, make matchIndex, make rangeIndex, defaultValue
+        public async Task<bool> TableCreateAsync(string tableName, string primaryKeyColumnName, List<Tuple<string, Type, bool, bool, object>> columnInfoList)
         {
             bool enterTableLock = false;
             try
@@ -137,7 +137,7 @@ namespace Redisql
                         defaultValue = "null";
                     }
 
-                    if (t.Item1.Equals(primaryKeyFieldName))
+                    if (t.Item1.Equals(primaryKeyColumnName))
                     {
                         pkFlag = true;
                         matchIndexFlag = false;

@@ -29,7 +29,7 @@ namespace Redisql
 
                 if (ts.primaryKeyColumnName.Equals(columnName))
                 {
-                    return false; // Can not add index to primary key field
+                    return false; // Can not add index to primary key column
                 }
 
                 ColumnSetting cs;
@@ -40,7 +40,7 @@ namespace Redisql
 
                 if (cs.isMatchIndex)
                 {
-                    return false; // Already indexed field. No need to add index.
+                    return false; // Already indexed column. No need to add index.
                 }
 
                 enterTableLock = true;
@@ -104,7 +104,7 @@ namespace Redisql
 
                 if (ts.primaryKeyColumnName.Equals(columnName))
                 {
-                    return false; // Can not remove index to primary key field
+                    return false; // Can not remove index to primary key column
                 }
 
                 ColumnSetting cs;
@@ -115,7 +115,7 @@ namespace Redisql
 
                 if (!cs.isMatchIndex)
                 {
-                    return false; // Not indexed field. Could not remove index.
+                    return false; // Not indexed column. Could not remove index.
                 }
 
                 enterTableLock = true;

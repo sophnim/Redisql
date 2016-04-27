@@ -51,7 +51,7 @@
     <Compile Include="Redisql_ColumnCreateDelete.cs" />
     <Compile Include="Redisql_MatchIndexAddRemove.cs" />
     <Compile Include="Redisql_RangeIndexAddRemove.cs" />
-    <Compile Include="Redisql_SelectRow.cs" />
+    <Compile Include="Redisql_TableRowCRUD.cs" />
     <Compile Include="Redisql_TableCreateDelete.cs" />
     <Compile Include="Settings.cs" />
   </ItemGroup>

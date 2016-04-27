@@ -13,7 +13,7 @@ namespace Redisql
     public partial class Redisql
     {
         // 테이블 row를 추가하고 추가된 row의 자동 증가 _id값을 얻는다.
-        public async Task<Int64> TableInsertRowAsync(string tableName, Dictionary<string, string> columnValues)
+        public async Task<Int64> TableRowInsertAsync(string tableName, Dictionary<string, string> columnValues)
         {
             string key;
             string primaryKeyValue = null;
@@ -153,7 +153,7 @@ namespace Redisql
             }
         }
 
-        public async Task<bool> TableUpdateRowAsync(string tableName, Dictionary<string, string> updateColumnValues)
+        public async Task<bool> TableRowUpdateAsync(string tableName, Dictionary<string, string> updateColumnValues)
         {
             bool enterLock = false;
             string primaryKeyValue = null;
@@ -280,7 +280,7 @@ namespace Redisql
             }
         }
 
-        public async Task<bool> TableDeleteRowAsync(string tableName, string primaryKeyValue)
+        public async Task<bool> TableRowDeleteAsync(string tableName, string primaryKeyValue)
         {
             try
             {
@@ -348,8 +348,8 @@ namespace Redisql
         }
 
         // primaryKeyValue하고 일치하는 테이블 row 1개를 선택한다.
-        // selectFields : 선택할 field name list. 만약 null이면 모든 field를 선택한다.
-        public async Task<Dictionary<string, string>> TableSelectRowByPrimaryKeyFieldValueAsync(List<string> selectColumnNames, string tableName, string primaryKeyValue)
+        // selectColumnNames : 선택할 column name list. 만약 null이면 모든 field를 선택한다.
+        public async Task<Dictionary<string, string>> TableRowSelectByPrimaryKeyColumnValueAsync(List<string> selectColumnNames, string tableName, string primaryKeyValue)
         {
             var retdic = new Dictionary<string, string>();
             var ts = await TableGetSettingAsync(tableName);
@@ -376,7 +376,7 @@ namespace Redisql
             }
             else
             {
-                // selectFields가 존재하면 해당 필드만 읽는다.
+                // selectColumnNames 존재하면 해당 컬럼만 읽는다.
                 var len = selectColumnNames.Count;
                 RedisValue[] rv = new RedisValue[len];
                 for (var i = 0; i < len; i++)
@@ -388,8 +388,8 @@ namespace Redisql
                     }
                     else
                     {
-                        // 존재하지 않는 field
-                        throw new Exception(string.Format("Table '{0}' does not have '{1}' field", tableName, selectColumnNames[i]));
+                        // 존재하지 않는 Column
+                        throw new Exception(string.Format("Table '{0}' does not have '{1}' column", tableName, selectColumnNames[i]));
                     }
                 }
                 var ret = await db.HashGetAsync(key, rv);
@@ -405,25 +405,25 @@ namespace Redisql
             return retdic;
         }
 
-        // 인덱스된 필드에 값이 일치하는 모든 테이블 row를 선택한다.
-        public async Task<List<Dictionary<string, string>>> TableSelectRowByMatchIndexFieldValueAsync(List<string> selectColumnNames, string tableName, string fieldName, string fieldValue)
+        // 인덱스된 컬럼 값이 일치하는 모든 테이블 row를 선택한다.
+        public async Task<List<Dictionary<string, string>>> TableRowSelectByMatchIndexFieldValueAsync(List<string> selectColumnNames, string tableName, string compareIndexColumnName, string columnValue)
         {
             var retlist = new List<Dictionary<string, string>>();
             var ts = await TableGetSettingAsync(tableName);
             var db = this.redis.GetDatabase();
 
             ColumnSetting cs;
-            if (!ts.tableSchemaDic.TryGetValue(fieldName, out cs))
+            if (!ts.tableSchemaDic.TryGetValue(compareIndexColumnName, out cs))
             {
                 return retlist;
             }
 
-            var key = GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, fieldValue);
+            var key = GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, columnValue);
             var pkvs = await db.SetMembersAsync(key);
 
             if (null == selectColumnNames)
             {
-                // selectedFields가 null이면 모든 field를 읽는다.
+                // selectColumnNames가 null이면 모든 column을 읽는다.
                 var tasklist = new List<Task<HashEntry[]>>();
                 foreach (var pk in pkvs)
                 {
@@ -449,7 +449,7 @@ namespace Redisql
             }
             else
             {
-                // selectField가 null이 아니면 해당 field만 읽는다.
+                // selectColumnNames가 null이 아니면 해당 column만 읽는다.
                 var len = selectColumnNames.Count;
                 var rva = new RedisValue[len];
                 for (var i = 0; i < len; i++)
@@ -490,14 +490,14 @@ namespace Redisql
         }
 
         // sort된 field값이 lowValue와 highValue 사이에 있는 모든 row를 구한다.
-        public async Task<List<Dictionary<string, string>>> TableSelectRowByRangeIndexFieldRangeAsync(List<string> selectColumnNames, string tableName, string CompareColumnName, string lowValue, string highValue)
+        public async Task<List<Dictionary<string, string>>> TableRowSelectByRangeIndexAsync(List<string> selectColumnNames, string tableName, string compareRangeIndexColumnName, string lowValue, string highValue)
         {
             var retlist = new List<Dictionary<string, string>>();
             var ts = await TableGetSettingAsync(tableName);
             var db = this.redis.GetDatabase();
 
             ColumnSetting cs;
-            if (!ts.tableSchemaDic.TryGetValue(CompareColumnName, out cs))
+            if (!ts.tableSchemaDic.TryGetValue(compareRangeIndexColumnName, out cs))
             {
                 return retlist;
             }
@@ -510,7 +510,7 @@ namespace Redisql
 
             if (null == selectColumnNames)
             {
-                // selectField가 null이면 모든 field를 읽는다.
+                // selectColumnNames가 null이면 모든 column을 읽는다.
                 List<Task<HashEntry[]>> tasklist = new List<Task<HashEntry[]>>();
                 foreach (var primaryKeyValue in primaryKeyValues)
                 {
@@ -536,7 +536,7 @@ namespace Redisql
             }
             else
             {
-                // selectField가 null이 아니면 해당 field만 읽는다.
+                // selectColumnNames가 null이 아니면 해당 column만 읽는다.
                 var len = selectColumnNames.Count;
                 var rva = new RedisValue[len];
                 for (var i = 0; i < len; i++)
