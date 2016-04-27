@@ -49,22 +49,22 @@ namespace Redisql
                 cs.isMatchIndex = true;
                 ts.matchIndexColumnDic.Add(columnName, cs.indexNumber);
 
-                var tableSchemaName = GetRedisKey_TableSchema(tableName);
+                var tableSchemaName = RedisKey.GetRedisKey_TableSchema(tableName);
 
                 var value = string.Format("{0},{1},{2},{3},{4},{5}", cs.indexNumber.ToString(), cs.dataType.ToString(), cs.isMatchIndex.ToString(), "False", cs.isRangeIndex.ToString(), cs.defaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
                 await db.HashSetAsync(tableSchemaName, columnName, value);
 
                 // 
                 var tasklist = new List<Task<bool>>();
-                var key = GetRedisKey_TablePrimaryKeyList(tableName);
+                var key = RedisKey.GetRedisKey_TablePrimaryKeyList(tableName);
                 var pvks = await db.SetMembersAsync(key);
                 foreach (var primaryKeyValue in pvks)
                 {
-                    key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
+                    key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
                     var v = await db.HashGetAsync(key, cs.indexNumber);
 
                     // add index
-                    key = GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, v.ToString());
+                    key = RedisKey.GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, v.ToString());
                     tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
                 }
 
@@ -124,22 +124,22 @@ namespace Redisql
                 cs.isMatchIndex = false;
                 ts.matchIndexColumnDic.Remove(columnName);
 
-                var tableSchemaName = GetRedisKey_TableSchema(tableName);
+                var tableSchemaName = RedisKey.GetRedisKey_TableSchema(tableName);
 
                 var value = string.Format("{0},{1},{2},{3},{4},{5}", cs.indexNumber.ToString(), cs.dataType.ToString(), cs.isMatchIndex.ToString(), "False", cs.isRangeIndex.ToString(), cs.defaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
                 await db.HashSetAsync(tableSchemaName, columnName, value);
 
                 // 
                 var tasklist = new List<Task<bool>>();
-                var key = GetRedisKey_TablePrimaryKeyList(tableName);
+                var key = RedisKey.GetRedisKey_TablePrimaryKeyList(tableName);
                 var pvks = await db.SetMembersAsync(key);
                 foreach (var primaryKeyValue in pvks)
                 {
-                    key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
+                    key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
                     var v = await db.HashGetAsync(key, cs.indexNumber);
 
                     // remove index
-                    key = GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, v.ToString());
+                    key = RedisKey.GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, v.ToString());
                     tasklist.Add(db.SetRemoveAsync(key, primaryKeyValue));
                 }
 

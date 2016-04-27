@@ -33,62 +33,6 @@ namespace Redisql
             Console.WriteLine("Redis Connected");
         }
 
-        private string GetRedisKey_TableSchema(string tableName)
-        {
-            return string.Format("C:{0}", tableName);
-        }
-
-        private string GetRedisKey_TableMatchIndexColumn(Int32 tableID, Int32 columnIndex, string value)
-        {
-            return string.Format("I:{0}:{1}:{2}", tableID.ToString(), columnIndex.ToString(), value);
-        }
-
-        private string GetRedisKey_TableRangeIndexColumn(Int32 tableID, Int32 columnIndex)
-        {
-            return string.Format("S:{0}:{1}", tableID.ToString(), columnIndex.ToString());
-        }
-
-        private string GetRedisKey_TableRow(Int32 tableID, string primaryKeyValue)
-        {
-            return string.Format("W:{0}:{1}", tableID.ToString(), primaryKeyValue);
-        }
-
-        private string GetRedisKey_TablePrimaryKeyList(string tableName)
-        {
-            return string.Format("K:{0}", tableName);
-        }
-
-        private string GetRedisKey_TableLock(string tableName, string primaryKeyValue)
-        {
-            return string.Format("L:{0}:{1}", tableName, primaryKeyValue);
-        }
-
-        private async Task<bool> TableLockEnterAsync(string tableName, string primaryKeyValue)
-        {
-            var db = this.redis.GetDatabase();
-            var key = GetRedisKey_TableLock(tableName, primaryKeyValue);
-            var ts = new TimeSpan(0, 0, 300);
-
-            bool ret;
-            do
-            {
-                ret = await db.StringSetAsync(key, Thread.CurrentThread.ManagedThreadId.ToString(), ts, When.NotExists);
-                if (false == ret)
-                {
-                    await Task.Delay(1);
-                }
-            } while (false == ret);
-
-            return true;
-        }
-
-        private void TableLockExit(string tableName, string primaryKeyValue)
-        {
-            var db = this.redis.GetDatabase();
-            var key = GetRedisKey_TableLock(tableName, primaryKeyValue);
-            db.KeyDeleteAsync(key, CommandFlags.FireAndForget);
-        }
-
         private Double ConvertToScore(Type type, string value)
         {
             switch (type.ToString())
@@ -130,7 +74,7 @@ namespace Redisql
                 ts.tableID = Convert.ToInt32(tableID.ToString());
 
                 // read table schema
-                var tableSchema = await db.HashGetAllAsync(GetRedisKey_TableSchema(tableName));
+                var tableSchema = await db.HashGetAllAsync(RedisKey.GetRedisKey_TableSchema(tableName));
                 if (null == tableSchema)
                 {
                     return null;

@@ -38,7 +38,7 @@ namespace Redisql
                     }
 
                     // check if row already exists
-                    key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
+                    key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
                     var ret = await db.KeyExistsAsync(key);
                     if (ret)
                     {
@@ -114,14 +114,14 @@ namespace Redisql
                         if (e.Value.isMatchIndex)
                         {
                             // make index
-                            key = GetRedisKey_TableMatchIndexColumn(ts.tableID, e.Value.indexNumber, value);
+                            key = RedisKey.GetRedisKey_TableMatchIndexColumn(ts.tableID, e.Value.indexNumber, value);
                             tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
                         }
 
                         if (e.Value.isRangeIndex)
                         {
                             // sorted set index
-                            key = GetRedisKey_TableRangeIndexColumn(ts.tableID, e.Value.indexNumber);
+                            key = RedisKey.GetRedisKey_TableRangeIndexColumn(ts.tableID, e.Value.indexNumber);
                             var score = ConvertToScore(e.Value.dataType, value);
                             tasklist.Add(db.SortedSetAddAsync(key, primaryKeyValue, score));
                         }
@@ -133,11 +133,11 @@ namespace Redisql
                 }
 
                 // save table row
-                key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
+                key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
                 tasklist.Add(db.HashSetAsync(key, heArray));
 
                 // save table primary key 
-                key = GetRedisKey_TablePrimaryKeyList(tableName);
+                key = RedisKey.GetRedisKey_TablePrimaryKeyList(tableName);
                 tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
 
                 foreach (var task in tasklist)
@@ -217,7 +217,7 @@ namespace Redisql
                         rvArray[index++] = e.Value.Item1;
                     }
 
-                    key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
+                    key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
                     var ret = await db.HashGetAsync(key, rvArray);
 
                     index = 0;
@@ -226,17 +226,17 @@ namespace Redisql
                         if (ts.matchIndexColumnDic.ContainsKey(e.Key))
                         {
                             // 원래 값으로 저장되어 있던 인덱스를 지우고 새 값으로 갱신
-                            key = GetRedisKey_TableMatchIndexColumn(ts.tableID, e.Value.Item1, ret[index].ToString());
+                            key = RedisKey.GetRedisKey_TableMatchIndexColumn(ts.tableID, e.Value.Item1, ret[index].ToString());
                             tasklist.Add(db.SetRemoveAsync(key, primaryKeyValue));
 
-                            key = GetRedisKey_TableMatchIndexColumn(ts.tableID, e.Value.Item1, e.Value.Item2);
+                            key = RedisKey.GetRedisKey_TableMatchIndexColumn(ts.tableID, e.Value.Item1, e.Value.Item2);
                             tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
                         }
 
                         if (ts.rangeIndexColumnDic.ContainsKey(e.Key))
                         {
                             // SortedSet의 Score를 갱신
-                            key = GetRedisKey_TableRangeIndexColumn(ts.tableID, e.Value.Item1);
+                            key = RedisKey.GetRedisKey_TableRangeIndexColumn(ts.tableID, e.Value.Item1);
                             var score = ConvertToScore(ts.tableSchemaDic[e.Key].dataType, e.Value.Item2);
                             tasklist.Add(db.SortedSetAddAsync(key, primaryKeyValue, score));
                         }
@@ -257,7 +257,7 @@ namespace Redisql
                 }
 
                 // save table row
-                key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
+                key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
                 tasklist.Add(db.HashSetAsync(key, heArray));
 
                 foreach (var task in tasklist)
@@ -296,7 +296,7 @@ namespace Redisql
                 }
 
                 // 지우기 전에 전체값을 읽는다. 인덱스를 지우기 위함이다.
-                var key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
+                var key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
                 var ret = await db.HashGetAllAsync(key);
                 if (null == ret)
                 {
@@ -312,22 +312,22 @@ namespace Redisql
                 // 인덱스 삭제
                 foreach (var fieldIndex in ts.matchIndexColumnDic.Values)
                 {
-                    key = GetRedisKey_TableMatchIndexColumn(ts.tableID, fieldIndex, fvdic[fieldIndex.ToString()]);
+                    key = RedisKey.GetRedisKey_TableMatchIndexColumn(ts.tableID, fieldIndex, fvdic[fieldIndex.ToString()]);
                     tasklist.Add(db.SetRemoveAsync(key, primaryKeyValue));
                 }
 
                 // sortedset 삭제
                 foreach (var e in ts.rangeIndexColumnDic)
                 {
-                    key = GetRedisKey_TableRangeIndexColumn(ts.tableID, e.Value);
+                    key = RedisKey.GetRedisKey_TableRangeIndexColumn(ts.tableID, e.Value);
                     tasklist.Add(db.SortedSetRemoveAsync(key, primaryKeyValue));
                 }
 
                 // 테이블 로우 아이템 삭제
-                key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
+                key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
                 tasklist.Add(db.KeyDeleteAsync(key));
 
-                key = GetRedisKey_TablePrimaryKeyList(tableName);
+                key = RedisKey.GetRedisKey_TablePrimaryKeyList(tableName);
                 tasklist.Add(db.SetRemoveAsync(key, primaryKeyValue));
 
                 foreach (var task in tasklist)
@@ -353,7 +353,7 @@ namespace Redisql
         {
             var retdic = new Dictionary<string, string>();
             var ts = await TableGetSettingAsync(tableName);
-            var key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
+            var key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
             var db = this.redis.GetDatabase();
 
             if (null == selectColumnNames)
@@ -418,7 +418,7 @@ namespace Redisql
                 return retlist;
             }
 
-            var key = GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, columnValue);
+            var key = RedisKey.GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, columnValue);
             var pkvs = await db.SetMembersAsync(key);
 
             if (null == selectColumnNames)
@@ -427,7 +427,7 @@ namespace Redisql
                 var tasklist = new List<Task<HashEntry[]>>();
                 foreach (var pk in pkvs)
                 {
-                    key = GetRedisKey_TableRow(ts.tableID, pk.ToString());
+                    key = RedisKey.GetRedisKey_TableRow(ts.tableID, pk.ToString());
                     tasklist.Add(db.HashGetAllAsync(key));
                 }
 
@@ -468,7 +468,7 @@ namespace Redisql
                 var tasklist = new List<Task<RedisValue[]>>();
                 foreach (var pk in pkvs)
                 {
-                    key = GetRedisKey_TableRow(ts.tableID, pk.ToString());
+                    key = RedisKey.GetRedisKey_TableRow(ts.tableID, pk.ToString());
                     tasklist.Add(db.HashGetAsync(key, rva));
                 }
 
@@ -505,7 +505,7 @@ namespace Redisql
             var lv = ConvertToScore(cs.dataType, lowValue);
             var hv = ConvertToScore(cs.dataType, highValue);
 
-            var key = GetRedisKey_TableRangeIndexColumn(ts.tableID, cs.indexNumber);
+            var key = RedisKey.GetRedisKey_TableRangeIndexColumn(ts.tableID, cs.indexNumber);
             var primaryKeyValues = await db.SortedSetRangeByScoreAsync(key, lv, hv);
 
             if (null == selectColumnNames)
@@ -514,7 +514,7 @@ namespace Redisql
                 List<Task<HashEntry[]>> tasklist = new List<Task<HashEntry[]>>();
                 foreach (var primaryKeyValue in primaryKeyValues)
                 {
-                    key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
+                    key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
                     tasklist.Add(db.HashGetAllAsync(key));
                 }
 
@@ -555,7 +555,7 @@ namespace Redisql
                 var tasklist = new List<Task<RedisValue[]>>();
                 foreach (var primaryKeyValue in primaryKeyValues)
                 {
-                    key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
+                    key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
                     tasklist.Add(db.HashGetAsync(key, rva));
                 }
 

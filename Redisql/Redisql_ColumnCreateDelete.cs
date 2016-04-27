@@ -67,31 +67,31 @@ namespace Redisql
 
                 ts.columnIndexNameDic.Add(cs.indexNumber.ToString(), columnName);
 
-                var tableSchemaName = GetRedisKey_TableSchema(tableName);
+                var tableSchemaName = RedisKey.GetRedisKey_TableSchema(tableName);
 
                 var value = string.Format("{0},{1},{2},{3},{4},{5}", cs.indexNumber.ToString(), cs.dataType.ToString(), makeMatchIndex.ToString(), "False", makeRangeIndex.ToString(), defaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
                 await db.HashSetAsync(tableSchemaName, columnName, value);
 
                 // 테이블 스키마 수정 완료되었으니 기존에 존재하는 테이블 아이템에 새로 추가된 field를 defaultValue로 모두 입력한다.
                 var tasklist = new List<Task<bool>>();
-                var key = GetRedisKey_TablePrimaryKeyList(tableName);
+                var key = RedisKey.GetRedisKey_TablePrimaryKeyList(tableName);
                 var pvks = await db.SetMembersAsync(key);
                 foreach (var primaryKeyValue in pvks)
                 {
-                    key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
+                    key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
                     tasklist.Add(db.HashSetAsync(key, cs.indexNumber.ToString(), defaultValue.ToString()));
 
                     if (makeMatchIndex)
                     {
                         // make match index
-                        key = GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, defaultValue.ToString());
+                        key = RedisKey.GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, defaultValue.ToString());
                         tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
                     }
 
                     if (makeRangeIndex)
                     {
                         // make range index
-                        key = GetRedisKey_TableRangeIndexColumn(ts.tableID, cs.indexNumber);
+                        key = RedisKey.GetRedisKey_TableRangeIndexColumn(ts.tableID, cs.indexNumber);
                         var score = ConvertToScore(cs.dataType, defaultValue.ToString());
                         tasklist.Add(db.SortedSetAddAsync(key, primaryKeyValue, score));
                     }
@@ -151,7 +151,7 @@ namespace Redisql
                 }
 
                 var tasklist = new List<Task<RedisValue[]>>();
-                var key = GetRedisKey_TablePrimaryKeyList(tableName);
+                var key = RedisKey.GetRedisKey_TablePrimaryKeyList(tableName);
                 var pkvs = await db.SetMembersAsync(key);
 
                 // read column stored value
@@ -160,7 +160,7 @@ namespace Redisql
                 rva[1] = cs.indexNumber;
                 foreach (var primaryKeyValue in pkvs)
                 {
-                    key = GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
+                    key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
                     tasklist.Add(db.HashGetAsync(key, rva));
                 }
 
@@ -170,17 +170,17 @@ namespace Redisql
                     var ret = await t;
                     if (cs.isMatchIndex)
                     {
-                        key = GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, ret[1].ToString());
+                        key = RedisKey.GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, ret[1].ToString());
                         tasklist2.Add(db.SetRemoveAsync(key, ret[0].ToString()));
                     }
 
                     if (cs.isRangeIndex)
                     {
-                        key = GetRedisKey_TableRangeIndexColumn(ts.tableID, cs.indexNumber);
+                        key = RedisKey.GetRedisKey_TableRangeIndexColumn(ts.tableID, cs.indexNumber);
                         tasklist2.Add(db.SortedSetRemoveAsync(key, ret[0].ToString()));
                     }
 
-                    key = GetRedisKey_TableRow(ts.tableID, ret[0].ToString());
+                    key = RedisKey.GetRedisKey_TableRow(ts.tableID, ret[0].ToString());
                     tasklist2.Add(db.HashDeleteAsync(key, cs.indexNumber));
                 }
 
@@ -204,7 +204,7 @@ namespace Redisql
                     ts.rangeIndexColumnDic.Remove(columnName);
                 }
 
-                key = GetRedisKey_TableSchema(tableName);
+                key = RedisKey.GetRedisKey_TableSchema(tableName);
                 await db.HashDeleteAsync(key, columnName);
 
                 return true;

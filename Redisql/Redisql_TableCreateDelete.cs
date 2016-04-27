@@ -28,7 +28,7 @@ namespace Redisql
                     return false;
                 }
 
-                var key = GetRedisKey_TablePrimaryKeyList(tableName);
+                var key = RedisKey.GetRedisKey_TablePrimaryKeyList(tableName);
 
                 // 모든 Table row를 지워서 삭제한다.
                 var tasklist = new List<Task<bool>>();
@@ -39,7 +39,7 @@ namespace Redisql
                 }
 
                 // 테이블 스키마 삭제
-                key = GetRedisKey_TableSchema(tableName);
+                key = RedisKey.GetRedisKey_TableSchema(tableName);
                 tasklist.Add(db.KeyDeleteAsync(key));
 
                 // 테이블 ID 해시 삭제
@@ -124,7 +124,7 @@ namespace Redisql
                 await db.HashSetAsync(Consts.RedisKey_Hash_TableNameIds, tableName, tableID);
 
                 // write table schema
-                var tableSchemaName = GetRedisKey_TableSchema(tableName);
+                var tableSchemaName = RedisKey.GetRedisKey_TableSchema(tableName);
                 int fieldIndex = 0;
                 foreach (var t in columnInfoList)
                 {

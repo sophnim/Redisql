@@ -153,7 +153,7 @@ namespace RedisqlTest
             };
             // Create Table
             redisql.TableCreateAsync("Account_Table", "name", fieldList).Wait();
-            
+
             List<Task> tasklist = new List<Task>();
             var stw = Stopwatch.StartNew();
             int testCount = 10;
@@ -261,6 +261,34 @@ namespace RedisqlTest
 
             Console.WriteLine("Total {0}ms", stw.ElapsedMilliseconds);
             */
+        }
+
+        public void Test3()
+        {
+            Redisql.Redisql redisql = new Redisql.Redisql("127.0.0.1", 6379, "");
+
+            var task0 = redisql.TableGetSettingAsync("Account_Table");
+            task0.Wait();
+            var ts = task0.Result;
+
+            List<Tuple<string, Type, bool, bool, object>> fieldList = new List<Tuple<string, Type, bool, bool, object>>()
+            {
+                new Tuple<string, Type, bool, bool, object>("name", typeof(String), true, false, null), // name, String type, index required, string can not be sorted, Default null means null value not allowed
+                new Tuple<string, Type, bool, bool, object>("level", typeof(Int32), true, true, 1), // level, Int32 type, index required, sort required, Default 1
+                new Tuple<string, Type, bool, bool, object>("exp", typeof(Int32), false, true, 0), // exp, Int32 type, index not required, sort required, Default 0
+                new Tuple<string, Type, bool, bool, object>("money", typeof(Int32), false, true, 1000), // money, Int32 type, index not required, sort required, Default 1000
+                new Tuple<string, Type, bool, bool, object>("time", typeof(DateTime), false, true, "now"), // time, DateTime type, index not required, sort required, Default now
+            };
+            // Create Table
+            redisql.TableCreateAsync("Account_Table", "_id", fieldList).Wait(); // primary key field is '_id'. _id is auto generated field that auto incremented when insert.
+
+            var valueDic = new Dictionary<string, string>()
+            {
+                { "name", "bruce" },
+                { "level", "1" },
+                { "exp", "100" }
+            };
+            var task1 = redisql.TableRowInsertAsync("Account_Table", valueDic);
         }
     }
 }

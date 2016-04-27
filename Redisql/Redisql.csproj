@@ -46,11 +46,13 @@
   <ItemGroup>
     <Compile Include="Consts.cs" />
     <Compile Include="Enums.cs" />
+    <Compile Include="RedisKey.cs" />
     <Compile Include="Redisql.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Redisql_ColumnCreateDelete.cs" />
     <Compile Include="Redisql_MatchIndexAddRemove.cs" />
     <Compile Include="Redisql_RangeIndexAddRemove.cs" />
+    <Compile Include="Redisql_TableLock.cs" />
     <Compile Include="Redisql_TableRowCRUD.cs" />
     <Compile Include="Redisql_TableCreateDelete.cs" />
     <Compile Include="Settings.cs" />
