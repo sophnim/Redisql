@@ -38,7 +38,10 @@ Redisql 인스턴스를 생성합니다:
     // Member_Table에서 Primary Key의 값이 John Smith인 row를 검색: 반환값 row는 컬럼이름, 컬럼값을 갖는 Dictionary입니다.
     var row = redisql.TableRowSelectByPrimaryKeyColumnValue(null, "Member_Table", "John Smith");
 
+TableRowSelectByPrimaryKeyColumnValue 함수를 호출할때 첫번째 파라미터를 null로 설정하면 조건이 만족하는 row의 모든 컬럼값을 읽습니다. 만약 읽고 싶은 컬럼을 지정한다면 지정된 컬럼값만 읽습니다:
 
+    var selectColumnNames = new List<string>() { "name", "age", "birthdate" };
+    var row = redisql.TableRowSelectByPrimaryKeyColumnValue(selectColumnNames, "Member_Table", "John Smith");
 
 Redis에 대한 접근은 Stackexchange.Redis를 사용하며 Redis의 자료구조인 Hash, Set, SortedSet, String을 사용해서 구현되었습니다.
 
