@@ -33,7 +33,10 @@ Redisql 인스턴스를 생성합니다:
     // TableRowInsert를 호출해서 row를 테이블에 입력합니다.
     redisql.TableRowInsert("Member_Table", rowInfo);
 
+이제 Member_Table 테이블에 1개의 row가 삽입됐습니다. 이 row를 검색해 봅니다. Primary Key가 'name' 컬럼에 설정되어 있으므로 name값으로 검색이 가능합니다:
 
+    // Member_Table에서 Primary Key의 값이 John Smith인 row를 검색: 반환값 row는 컬럼이름, 컬럼값을 갖는 Dictionary입니다.
+    var row = redisql.TableRowSelectByPrimaryKeyColumnValue(null, "Member_Table", "John Smith");
 
 
 
