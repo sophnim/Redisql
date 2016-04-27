@@ -16,8 +16,8 @@ Redisql 인스턴스를 생성합니다:
         new Tuple<string, Type, bool, bool, object>("gender", typeof(Int32), false, false, 0), 
         new Tuple<string, Type, bool, bool, object>("birthdate", typeof(DateTime), false, false, "now") 
     };
-    // Create Table
-    redisql.TableCreateAsync("Account_Table", "name", columnList).Wait();
+    // 테이블을 생성합니다. 이때 테이블의 PrimaryKey는 'name' column으로 지정했습니다.
+    redisql.TableCreate("Member_Table", "name", columnList);
 
 테이블 행(row)단위로 데이터를 입력합니다.
 
