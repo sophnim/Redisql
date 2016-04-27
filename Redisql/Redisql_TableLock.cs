@@ -23,9 +23,7 @@ namespace Redisql
             {
                 ret = await db.StringSetAsync(key, Thread.CurrentThread.ManagedThreadId.ToString(), ts, When.NotExists);
                 if (false == ret)
-                {
                     await Task.Delay(1);
-                }
             } while (false == ret);
 
             return true;

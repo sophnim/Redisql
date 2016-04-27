@@ -18,20 +18,15 @@ namespace Redisql
             try
             {
                 if (defaultValue == null)
-                {
                     return false;
-                }
-
+                
                 var db = this.redis.GetDatabase();
 
                 var ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
-                {
                     return false;
-                }
-
-                enterTableLock = true;
-                await TableLockEnterAsync(tableName, "");
+                
+                enterTableLock = await TableLockEnterAsync(tableName, "");
 
                 var cs = new ColumnSetting();
                 cs.indexNumber = ts.GetNextColumnIndexNumber();
@@ -56,15 +51,11 @@ namespace Redisql
                 ts.tableSchemaDic.Add(columnName, cs);
 
                 if (makeMatchIndex)
-                {
                     ts.matchIndexColumnDic.Add(columnName, cs.indexNumber);
-                }
-
+                
                 if (makeRangeIndex)
-                {
                     ts.rangeIndexColumnDic.Add(columnName, cs.indexNumber);
-                }
-
+                
                 ts.columnIndexNameDic.Add(cs.indexNumber.ToString(), columnName);
 
                 var tableSchemaName = RedisKey.GetRedisKey_TableSchema(tableName);
@@ -72,7 +63,7 @@ namespace Redisql
                 var value = string.Format("{0},{1},{2},{3},{4},{5}", cs.indexNumber.ToString(), cs.dataType.ToString(), makeMatchIndex.ToString(), "False", makeRangeIndex.ToString(), defaultValue.ToString()); // fieldIndex, Type, IndexFlag, primaryKeyFlag, sortFlag
                 await db.HashSetAsync(tableSchemaName, columnName, value);
 
-                // 테이블 스키마 수정 완료되었으니 기존에 존재하는 테이블 아이템에 새로 추가된 field를 defaultValue로 모두 입력한다.
+
                 var tasklist = new List<Task<bool>>();
                 var key = RedisKey.GetRedisKey_TablePrimaryKeyList(tableName);
                 var pvks = await db.SetMembersAsync(key);
@@ -111,9 +102,7 @@ namespace Redisql
             finally
             {
                 if (enterTableLock)
-                {
                     TableLockExit(tableName, "");
-                }
             }
         }
 
@@ -126,29 +115,21 @@ namespace Redisql
 
                 var ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
-                {
                     return false;
-                }
-
+                
                 if (ts.primaryKeyColumnName.Equals(columnName))
-                {
                     return false; // Can not delete PrimaryKey column
-                }
-
-                enterTableLock = true;
-                await TableLockEnterAsync(tableName, "");
+                
+                enterTableLock = await TableLockEnterAsync(tableName, "");
 
                 ColumnSetting cs;
                 if (!ts.tableSchemaDic.TryGetValue(ts.primaryKeyColumnName, out cs))
-                {
                     return false;
-                }
+                
                 var primaryKeyColumnIndex = cs.indexNumber;
 
                 if (!ts.tableSchemaDic.TryGetValue(columnName, out cs))
-                {
                     return false;
-                }
 
                 var tasklist = new List<Task<RedisValue[]>>();
                 var key = RedisKey.GetRedisKey_TablePrimaryKeyList(tableName);
@@ -195,15 +176,11 @@ namespace Redisql
 
                 Int32 v;
                 if (ts.matchIndexColumnDic.TryGetValue(columnName, out v))
-                {
                     ts.matchIndexColumnDic.Remove(columnName);
-                }
-
+                
                 if (ts.rangeIndexColumnDic.TryGetValue(columnName, out v))
-                {
                     ts.rangeIndexColumnDic.Remove(columnName);
-                }
-
+                
                 key = RedisKey.GetRedisKey_TableSchema(tableName);
                 await db.HashDeleteAsync(key, columnName);
 
@@ -216,9 +193,7 @@ namespace Redisql
             finally
             {
                 if (enterTableLock)
-                {
                     TableLockExit(tableName, "");
-                }
             }
         }
     }

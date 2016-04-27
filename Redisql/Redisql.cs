@@ -54,6 +54,71 @@ namespace Redisql
             }
         }
 
+        private bool CheckDataType(Type dataType, string value)
+        {
+            switch (dataType.ToString())
+            {
+                case "System.Byte":
+                    {
+                        Byte result;
+                        if (!Byte.TryParse(value, out result)) return false;
+                    }
+                    break;
+
+                case "System.Int16":
+                    {
+                        Int16 result;
+                        if (!Int16.TryParse(value, out result)) return false;
+                    }
+                    break;
+
+                case "System.UInt16":
+                    {
+                        UInt16 result;
+                        if (!UInt16.TryParse(value, out result)) return false;
+                    }
+                    break;
+
+                case "System.Int32":
+                    {
+                        Int32 result;
+                        if (!Int32.TryParse(value, out result)) return false;
+                    }
+                    break;
+
+                case "System.UInt32":
+                    {
+                        UInt32 result;
+                        if (!UInt32.TryParse(value, out result)) return false;
+                    }
+                    break;
+
+                case "System.Single":
+                    {
+                        Single result;
+                        if (!Single.TryParse(value, out result)) return false;
+                    }
+                    break;
+
+                case "System.Double":
+                    {
+                        Double result;
+                        if (!Double.TryParse(value, out result)) return false;
+                    }
+                    break;
+
+                case "System.DateTime":
+                    {
+                        DateTime result;
+                        if (!DateTime.TryParse(value, out result)) return false;
+                    }
+                    break;
+            }
+
+            return true;
+        }
+
+
         public async Task<TableSetting> TableGetSettingAsync(string tableName)
         {
             TableSetting ts;

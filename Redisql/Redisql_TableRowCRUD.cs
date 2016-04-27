@@ -12,8 +12,8 @@ namespace Redisql
 {
     public partial class Redisql
     {
-        // 테이블 row를 추가하고 추가된 row의 자동 증가 _id값을 얻는다.
-        public async Task<Int64> TableRowInsertAsync(string tableName, Dictionary<string, string> columnValues)
+        // add row to table and get auto incremented _id value
+        public async Task<Int64> TableRowInsertAsync(string tableName, Dictionary<string, string> insertRowColumnNameValuePairs)
         {
             string key;
             string primaryKeyValue = null;
@@ -24,39 +24,29 @@ namespace Redisql
 
                 var ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
-                {
                     return -1;
-                }
-
+                
                 if (!ts.primaryKeyColumnName.Equals("_id"))
                 {
-                    // Insert하려는 row의 primary key field가 이미 존재하면 insert는 할수 없음
                     // get primaryKey value of insert row
-                    if (!columnValues.TryGetValue(ts.primaryKeyColumnName, out primaryKeyValue))
-                    {
+                    if (!insertRowColumnNameValuePairs.TryGetValue(ts.primaryKeyColumnName, out primaryKeyValue))
                         return -1;
-                    }
-
+                    
                     // check if row already exists
                     key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
                     var ret = await db.KeyExistsAsync(key);
                     if (ret)
-                    {
                         return -1;
-                    }
                 }
 
                 HashEntry[] heArray = new HashEntry[ts.tableSchemaDic.Count];
 
-                // 자동 증가값 _id의 값을 설정한다.
+                // get _id value : auto increment
                 var idValue = await db.HashIncrementAsync(Consts.RedisKey_Hash_TableAutoIncrementColumnValues, ts.tableID.ToString());
                 heArray[0] = new HashEntry(0, idValue);
 
                 if (ts.primaryKeyColumnName.Equals("_id"))
-                {
                     primaryKeyValue = idValue.ToString();
-                }
-
 
                 int arrayIndex = 1;
                 List<Task> tasklist = new List<Task>();
@@ -64,11 +54,14 @@ namespace Redisql
                 foreach (var e in ts.tableSchemaDic)
                 {
                     var cs = e.Value;
-                    if (!e.Key.Equals("_id")) // _id Column은 사용자가 값을 할당할 수 없다.
+                    if (!e.Key.Equals("_id")) // _id Column can not assigned from request : ignored
                     {
                         string value;
-                        if (columnValues.TryGetValue(e.Key, out value))
+                        if (insertRowColumnNameValuePairs.TryGetValue(e.Key, out value))
                         {
+                            if (!CheckDataType(cs.dataType, value)) // check column value data type 
+                                return -1;
+
                             heArray[arrayIndex++] = new HashEntry(cs.indexNumber, value);
                         }
                         else
@@ -90,6 +83,7 @@ namespace Redisql
                                     case "System.UInt32":
                                     case "System.Single":
                                     case "System.Double":
+                                    case "System.String":
                                         heArray[arrayIndex++] = new HashEntry(cs.indexNumber, cs.defaultValue.ToString());
                                         break;
 
@@ -113,14 +107,14 @@ namespace Redisql
 
                         if (e.Value.isMatchIndex)
                         {
-                            // make index
+                            // make match index
                             key = RedisKey.GetRedisKey_TableMatchIndexColumn(ts.tableID, e.Value.indexNumber, value);
                             tasklist.Add(db.SetAddAsync(key, primaryKeyValue));
                         }
 
                         if (e.Value.isRangeIndex)
                         {
-                            // sorted set index
+                            // make range index
                             key = RedisKey.GetRedisKey_TableRangeIndexColumn(ts.tableID, e.Value.indexNumber);
                             var score = ConvertToScore(e.Value.dataType, value);
                             tasklist.Add(db.SortedSetAddAsync(key, primaryKeyValue, score));
@@ -153,9 +147,10 @@ namespace Redisql
             }
         }
 
-        public async Task<bool> TableRowUpdateAsync(string tableName, Dictionary<string, string> updateColumnValues)
+        public async Task<bool> TableRowUpdateAsync(string tableName, Dictionary<string, string> updateColumnNameValuePairs)
         {
-            bool enterLock = false;
+            string key;
+            bool enterTableLock = false;
             string primaryKeyValue = null;
 
             try
@@ -165,54 +160,39 @@ namespace Redisql
 
                 var ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
-                {
                     return false;
-                }
+                
+                if (!updateColumnNameValuePairs.TryGetValue(ts.primaryKeyColumnName, out primaryKeyValue))
+                    return false; // primary key column not found
 
-                // 업데이트하려는 row의 primaryKey value를 얻는다.
-                if (!updateColumnValues.TryGetValue(ts.primaryKeyColumnName, out primaryKeyValue))
-                {
-                    // 업데이트하려는 값 정보에 PrimaryKey value가 없다. 
-                    return false;
-                }
 
-                // 업데이트 하려는 row의 값중 인덱스, Sorted된 값을 찾는다. 이 값들은 읽어서 갱신해야 한다.
-                var updatedFields = new Dictionary<string, Tuple<Int32, string>>(); // fieldName, Tuple<fieldIndex, updatedValue>
+                var updatedColumns = new Dictionary<string, Tuple<Int32, string>>(); // Column name, Tuple<columnIndex, updatedValue>
 
                 foreach (var e in ts.matchIndexColumnDic)
                 {
                     string value;
-                    if (updateColumnValues.TryGetValue(e.Key, out value))
-                    {
-                        // update 하려는 값중에 인덱스가 걸려있는 값이 있다. 인덱스를 갱신해야 한다.
-                        updatedFields.Add(e.Key, new Tuple<Int32, string>(e.Value, value));
-                    }
+                    if (updateColumnNameValuePairs.TryGetValue(e.Key, out value))
+                        updatedColumns.Add(e.Key, new Tuple<Int32, string>(e.Value, value)); // update column is index column
                 }
 
                 foreach (var e in ts.rangeIndexColumnDic)
                 {
                     string value;
-                    if (updateColumnValues.TryGetValue(e.Key, out value))
+                    if (updateColumnNameValuePairs.TryGetValue(e.Key, out value))
                     {
-                        if (!updatedFields.ContainsKey(e.Key))
-                        {
-                            // 인덱스에서 추가된 값과 중복되지 않는 경우에만 추가 
-                            updatedFields.Add(e.Key, new Tuple<Int32, string>(e.Value, value));
-                        }
+                        if (!updatedColumns.ContainsKey(e.Key))
+                            updatedColumns.Add(e.Key, new Tuple<Int32, string>(e.Value, value)); // add if not duplicated with index column
                     }
                 }
 
-                enterLock = true;
-                await TableLockEnterAsync(tableName, primaryKeyValue);
+                enterTableLock = await TableLockEnterAsync(tableName, primaryKeyValue);
 
-                string key;
-
-                // 인덱스에 저장되어 있는 값을 가져온다.
-                if (updatedFields.Count > 0)
+                // get values from stored in update columns
+                if (updatedColumns.Count > 0)
                 {
                     int index = 0;
-                    var rvArray = new RedisValue[updatedFields.Count];
-                    foreach (var e in updatedFields)
+                    var rvArray = new RedisValue[updatedColumns.Count];
+                    foreach (var e in updatedColumns)
                     {
                         rvArray[index++] = e.Value.Item1;
                     }
@@ -221,11 +201,11 @@ namespace Redisql
                     var ret = await db.HashGetAsync(key, rvArray);
 
                     index = 0;
-                    foreach (var e in updatedFields)
+                    foreach (var e in updatedColumns)
                     {
                         if (ts.matchIndexColumnDic.ContainsKey(e.Key))
                         {
-                            // 원래 값으로 저장되어 있던 인덱스를 지우고 새 값으로 갱신
+                            // update match index column to new value
                             key = RedisKey.GetRedisKey_TableMatchIndexColumn(ts.tableID, e.Value.Item1, ret[index].ToString());
                             tasklist.Add(db.SetRemoveAsync(key, primaryKeyValue));
 
@@ -235,7 +215,7 @@ namespace Redisql
 
                         if (ts.rangeIndexColumnDic.ContainsKey(e.Key))
                         {
-                            // SortedSet의 Score를 갱신
+                            // update range index column to new value
                             key = RedisKey.GetRedisKey_TableRangeIndexColumn(ts.tableID, e.Value.Item1);
                             var score = ConvertToScore(ts.tableSchemaDic[e.Key].dataType, e.Value.Item2);
                             tasklist.Add(db.SortedSetAddAsync(key, primaryKeyValue, score));
@@ -246,8 +226,8 @@ namespace Redisql
                 }
 
                 int arrayIndex = 0;
-                HashEntry[] heArray = new HashEntry[updateColumnValues.Count];
-                foreach (var e in updateColumnValues)
+                HashEntry[] heArray = new HashEntry[updateColumnNameValuePairs.Count];
+                foreach (var e in updateColumnNameValuePairs)
                 {
                     ColumnSetting cs;
                     if (ts.tableSchemaDic.TryGetValue(e.Key, out cs))
@@ -273,35 +253,30 @@ namespace Redisql
             }
             finally
             {
-                if (enterLock)
-                {
+                if (enterTableLock)
                     TableLockExit(tableName, primaryKeyValue);
-                }
             }
         }
 
         public async Task<bool> TableRowDeleteAsync(string tableName, string primaryKeyValue)
         {
+            bool enterTableLock = false;
             try
             {
-                await TableLockEnterAsync(tableName, primaryKeyValue);
+                enterTableLock = await TableLockEnterAsync(tableName, primaryKeyValue);
 
                 var db = this.redis.GetDatabase();
                 List<Task> tasklist = new List<Task>();
 
                 var ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
-                {
                     return false;
-                }
 
-                // 지우기 전에 전체값을 읽는다. 인덱스를 지우기 위함이다.
+                // before delete, read all row to delete index
                 var key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
                 var ret = await db.HashGetAllAsync(key);
                 if (null == ret)
-                {
                     return false;
-                }
 
                 var fvdic = new Dictionary<string, string>();
                 foreach (var e in ret)
@@ -309,21 +284,21 @@ namespace Redisql
                     fvdic.Add(e.Name.ToString(), e.Value.ToString());
                 }
 
-                // 인덱스 삭제
+                // delete match index
                 foreach (var fieldIndex in ts.matchIndexColumnDic.Values)
                 {
                     key = RedisKey.GetRedisKey_TableMatchIndexColumn(ts.tableID, fieldIndex, fvdic[fieldIndex.ToString()]);
                     tasklist.Add(db.SetRemoveAsync(key, primaryKeyValue));
                 }
 
-                // sortedset 삭제
+                // delete range index
                 foreach (var e in ts.rangeIndexColumnDic)
                 {
                     key = RedisKey.GetRedisKey_TableRangeIndexColumn(ts.tableID, e.Value);
                     tasklist.Add(db.SortedSetRemoveAsync(key, primaryKeyValue));
                 }
 
-                // 테이블 로우 아이템 삭제
+                // delete table row
                 key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
                 tasklist.Add(db.KeyDeleteAsync(key));
 
@@ -343,22 +318,23 @@ namespace Redisql
             }
             finally
             {
-                TableLockExit(tableName, primaryKeyValue);
+                if (enterTableLock)
+                    TableLockExit(tableName, primaryKeyValue);
             }
         }
 
-        // primaryKeyValue하고 일치하는 테이블 row 1개를 선택한다.
-        // selectColumnNames : 선택할 column name list. 만약 null이면 모든 field를 선택한다.
-        public async Task<Dictionary<string, string>> TableRowSelectByPrimaryKeyColumnValueAsync(List<string> selectColumnNames, string tableName, string primaryKeyValue)
+        // select one row that matches with primary key column value. 
+        // If selectColumnNames is null, select all columns in selected row, or select specified columns only.
+        public async Task<Dictionary<string, string>> TableRowSelectByPrimaryKeyColumnValueAsync(List<string> selectColumnNames, string tableName, string primaryKeyColumnValue)
         {
             var retdic = new Dictionary<string, string>();
             var ts = await TableGetSettingAsync(tableName);
-            var key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
+            var key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyColumnValue);
             var db = this.redis.GetDatabase();
 
             if (null == selectColumnNames)
             {
-                // selectFields가 null이면 모든 필드를 읽는다.
+                // read all column values
                 var ret = await db.HashGetAllAsync(key);
                 if (null != ret)
                 {
@@ -376,7 +352,7 @@ namespace Redisql
             }
             else
             {
-                // selectColumnNames 존재하면 해당 컬럼만 읽는다.
+                // read specified column values
                 var len = selectColumnNames.Count;
                 RedisValue[] rv = new RedisValue[len];
                 for (var i = 0; i < len; i++)
@@ -388,7 +364,7 @@ namespace Redisql
                     }
                     else
                     {
-                        // 존재하지 않는 Column
+                        // not existing column name
                         throw new Exception(string.Format("Table '{0}' does not have '{1}' column", tableName, selectColumnNames[i]));
                     }
                 }
@@ -405,25 +381,23 @@ namespace Redisql
             return retdic;
         }
 
-        // 인덱스된 컬럼 값이 일치하는 모든 테이블 row를 선택한다.
-        public async Task<List<Dictionary<string, string>>> TableRowSelectByMatchIndexFieldValueAsync(List<string> selectColumnNames, string tableName, string compareIndexColumnName, string columnValue)
+        // select all rows that matches match index column value
+        public async Task<List<Dictionary<string, string>>> TableRowSelectByMatchIndexColumnValueAsync(List<string> selectColumnNames, string tableName, string compareMatchIndexColumnName, string compareColumnValue)
         {
             var retlist = new List<Dictionary<string, string>>();
             var ts = await TableGetSettingAsync(tableName);
             var db = this.redis.GetDatabase();
 
             ColumnSetting cs;
-            if (!ts.tableSchemaDic.TryGetValue(compareIndexColumnName, out cs))
-            {
-                return retlist;
-            }
+            if (!ts.tableSchemaDic.TryGetValue(compareMatchIndexColumnName, out cs))
+                throw new Exception(string.Format("Table '{0}' does not have '{1}' column", tableName, compareMatchIndexColumnName));
 
-            var key = RedisKey.GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, columnValue);
+            var key = RedisKey.GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, compareColumnValue);
             var pkvs = await db.SetMembersAsync(key);
 
             if (null == selectColumnNames)
             {
-                // selectColumnNames가 null이면 모든 column을 읽는다.
+                // read all columns
                 var tasklist = new List<Task<HashEntry[]>>();
                 foreach (var pk in pkvs)
                 {
@@ -449,7 +423,7 @@ namespace Redisql
             }
             else
             {
-                // selectColumnNames가 null이 아니면 해당 column만 읽는다.
+                // read specified columns
                 var len = selectColumnNames.Count;
                 var rva = new RedisValue[len];
                 for (var i = 0; i < len; i++)
@@ -460,8 +434,8 @@ namespace Redisql
                     }
                     else
                     {
-                        // 존재하지 않는 field
-                        throw new Exception(string.Format("Table '{0}' does not have '{1}' field", tableName, selectColumnNames[i]));
+                        // not existing column
+                        throw new Exception(string.Format("Table '{0}' does not have '{1}' column", tableName, selectColumnNames[i]));
                     }
                 }
 
@@ -489,7 +463,7 @@ namespace Redisql
             return retlist;
         }
 
-        // sort된 field값이 lowValue와 highValue 사이에 있는 모든 row를 구한다.
+        // select all rows that has range index column values is between lowValue and highValue
         public async Task<List<Dictionary<string, string>>> TableRowSelectByRangeIndexAsync(List<string> selectColumnNames, string tableName, string compareRangeIndexColumnName, string lowValue, string highValue)
         {
             var retlist = new List<Dictionary<string, string>>();
@@ -510,7 +484,7 @@ namespace Redisql
 
             if (null == selectColumnNames)
             {
-                // selectColumnNames가 null이면 모든 column을 읽는다.
+                // read all columns
                 List<Task<HashEntry[]>> tasklist = new List<Task<HashEntry[]>>();
                 foreach (var primaryKeyValue in primaryKeyValues)
                 {
@@ -536,7 +510,7 @@ namespace Redisql
             }
             else
             {
-                // selectColumnNames가 null이 아니면 해당 column만 읽는다.
+                // read specified columns
                 var len = selectColumnNames.Count;
                 var rva = new RedisValue[len];
                 for (var i = 0; i < len; i++)
@@ -547,8 +521,8 @@ namespace Redisql
                     }
                     else
                     {
-                        // 존재하지 않는 field
-                        throw new Exception(string.Format("Table '{0}' does not have '{1}' field", tableName, selectColumnNames[i]));
+                        // not existing column
+                        throw new Exception(string.Format("Table '{0}' does not have '{1}' column", tableName, selectColumnNames[i]));
                     }
                 }
 

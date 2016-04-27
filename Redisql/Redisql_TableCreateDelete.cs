@@ -17,20 +17,17 @@ namespace Redisql
             bool enterTableLock = false;
             try
             {
-                enterTableLock = true;
-                await TableLockEnterAsync(tableName, "");
+                enterTableLock = await TableLockEnterAsync(tableName, "");
 
                 var db = this.redis.GetDatabase();
 
                 var ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
-                {
                     return false;
-                }
 
                 var key = RedisKey.GetRedisKey_TablePrimaryKeyList(tableName);
 
-                // 모든 Table row를 지워서 삭제한다.
+                // delete every table rows
                 var tasklist = new List<Task<bool>>();
                 var pkvs = await db.SetMembersAsync(key);
                 foreach (var primaryKeyValue in pkvs)
@@ -38,21 +35,21 @@ namespace Redisql
                     tasklist.Add(TableRowDeleteAsync(tableName, primaryKeyValue.ToString()));
                 }
 
-                // 테이블 스키마 삭제
+                // delete table schema 
                 key = RedisKey.GetRedisKey_TableSchema(tableName);
                 tasklist.Add(db.KeyDeleteAsync(key));
 
-                // 테이블 ID 해시 삭제
+                // delete table name id
                 tasklist.Add(db.HashDeleteAsync(Consts.RedisKey_Hash_TableNameIds, tableName));
 
-                // 테이블 자동 증가 값 해시 삭제
+                // delete table auto increment column value
                 tasklist.Add(db.HashDeleteAsync(Consts.RedisKey_Hash_TableAutoIncrementColumnValues, ts.tableID));
 
                 foreach (var t in tasklist)
                 {
                     await t;
                 }
-
+                
                 // 메모리상의 테이블 세팅 삭제
                 this.tableSettingDic.TryRemove(tableName, out ts);
 
@@ -66,9 +63,7 @@ namespace Redisql
             finally
             {
                 if (enterTableLock)
-                {
                     TableLockExit(tableName, "");
-                }
             }
         }
 
@@ -81,6 +76,9 @@ namespace Redisql
                 // check input parameters 
                 foreach (var tpl in columnInfoList)
                 {
+                    if (tpl.Item1.Equals("_id"))
+                        return false; // _id column name is reserved.  
+
                     if (tpl.Item4)
                     {
                         switch (tpl.Item2.ToString())
@@ -101,21 +99,17 @@ namespace Redisql
                     }
                 }
 
-                // 모든 테이블은 기본적으로 _id field가 추가되고 이 필드는 자동 증가값을 갖는다.
+                // every table automatically generate _id column (auto increment)
                 columnInfoList.Insert(0, new Tuple<string, Type, bool, bool, object>("_id", typeof(Int64), false, false, null));
 
-                enterTableLock = true;
-                await TableLockEnterAsync(tableName, "");
+                enterTableLock = await TableLockEnterAsync(tableName, "");
 
                 var db = this.redis.GetDatabase();
 
                 // check table already exists
                 var ret = await db.HashExistsAsync(Consts.RedisKey_Hash_TableNameIds, tableName);
                 if (ret)
-                {
-                    // already existing table name
-                    return false;
-                }
+                    return false; // already existing table name
 
                 // get table id
                 var tableID = await db.StringIncrementAsync(Consts.RedisKey_String_TableNameIds);
@@ -133,9 +127,7 @@ namespace Redisql
                     bool rangeIndexFlag = t.Item4;
                     object defaultValue = t.Item5;
                     if (defaultValue == null)
-                    {
                         defaultValue = "null";
-                    }
 
                     if (t.Item1.Equals(primaryKeyColumnName))
                     {
@@ -156,9 +148,7 @@ namespace Redisql
             finally
             {
                 if (enterTableLock)
-                {
                     TableLockExit(tableName, "");
-                }
             }
         }
     }

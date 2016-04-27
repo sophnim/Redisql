@@ -22,29 +22,20 @@ namespace Redisql
 
                 var ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
-                {
                     return false;
-                }
-
+                
                 ColumnSetting cs;
                 if (!ts.tableSchemaDic.TryGetValue(columnName, out cs))
-                {
                     return false;
-                }
-
+                
                 if (cs.isRangeIndex)
-                {
                     return false; // Already range indexed column. 
-                }
-
+                
                 bool pkFlag = false;
                 if (ts.primaryKeyColumnName.Equals(columnName))
-                {
                     pkFlag = true;
-                }
-
-                enterTableLock = true;
-                await TableLockEnterAsync(tableName, "");
+                
+                enterTableLock = await TableLockEnterAsync(tableName, "");
 
                 cs.isRangeIndex = true;
                 ts.rangeIndexColumnDic.Add(columnName, cs.indexNumber);
@@ -83,9 +74,7 @@ namespace Redisql
             finally
             {
                 if (enterTableLock)
-                {
                     TableLockExit(tableName, "");
-                }
             }
         }
 
@@ -99,29 +88,20 @@ namespace Redisql
 
                 var ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
-                {
                     return false;
-                }
-
+                
                 ColumnSetting cs;
                 if (!ts.tableSchemaDic.TryGetValue(columnName, out cs))
-                {
                     return false;
-                }
-
+                
                 if (!cs.isRangeIndex)
-                {
                     return false; // Not range indexed column. 
-                }
-
+                
                 bool pkFlag = false;
                 if (ts.primaryKeyColumnName.Equals(columnName))
-                {
                     pkFlag = true;
-                }
-
-                enterTableLock = true;
-                await TableLockEnterAsync(tableName, "");
+                
+                enterTableLock = await TableLockEnterAsync(tableName, "");
 
                 cs.isRangeIndex = false;
                 ts.rangeIndexColumnDic.Remove(columnName);
@@ -147,7 +127,8 @@ namespace Redisql
 
                 foreach (var t in tasklist)
                 {
-                    if (!await t) return false;
+                    if (!await t)
+                        return false;
                 }
 
                 return true;
@@ -159,9 +140,7 @@ namespace Redisql
             finally
             {
                 if (enterTableLock)
-                {
                     TableLockExit(tableName, "");
-                }
             }
         }
     }

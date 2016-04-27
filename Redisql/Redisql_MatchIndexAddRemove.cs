@@ -23,28 +23,19 @@ namespace Redisql
 
                 var ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
-                {
                     return false;
-                }
-
+                
                 if (ts.primaryKeyColumnName.Equals(columnName))
-                {
                     return false; // Can not add index to primary key column
-                }
-
+                
                 ColumnSetting cs;
                 if (!ts.tableSchemaDic.TryGetValue(columnName, out cs))
-                {
                     return false;
-                }
-
+                
                 if (cs.isMatchIndex)
-                {
                     return false; // Already indexed column. No need to add index.
-                }
-
-                enterTableLock = true;
-                await TableLockEnterAsync(tableName, "");
+                
+                enterTableLock = await TableLockEnterAsync(tableName, "");
 
                 cs.isMatchIndex = true;
                 ts.matchIndexColumnDic.Add(columnName, cs.indexNumber);
@@ -82,9 +73,7 @@ namespace Redisql
             finally
             {
                 if (enterTableLock)
-                {
                     TableLockExit(tableName, "");
-                }
             }
         }
 
@@ -98,28 +87,19 @@ namespace Redisql
 
                 var ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
-                {
                     return false;
-                }
-
+                
                 if (ts.primaryKeyColumnName.Equals(columnName))
-                {
                     return false; // Can not remove index to primary key column
-                }
-
+                
                 ColumnSetting cs;
                 if (!ts.tableSchemaDic.TryGetValue(columnName, out cs))
-                {
                     return false;
-                }
-
+                
                 if (!cs.isMatchIndex)
-                {
                     return false; // Not indexed column. Could not remove index.
-                }
-
-                enterTableLock = true;
-                await TableLockEnterAsync(tableName, "");
+                
+                enterTableLock = await TableLockEnterAsync(tableName, "");
 
                 cs.isMatchIndex = false;
                 ts.matchIndexColumnDic.Remove(columnName);
@@ -157,9 +137,7 @@ namespace Redisql
             finally
             {
                 if (enterTableLock)
-                {
                     TableLockExit(tableName, "");
-                }
             }
         }
     }

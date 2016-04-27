@@ -89,7 +89,7 @@ namespace RedisqlTest
             Console.WriteLine();
 
             Console.WriteLine("select name, level from Account_Table where level == 1");
-            var task5 = redisql.TableRowSelectByMatchIndexFieldValueAsync(new List<string> { "name", "level" }, "Account_Table", "level", "1");
+            var task5 = redisql.TableRowSelectByMatchIndexColumnValueAsync(new List<string> { "name", "level" }, "Account_Table", "level", "1");
             task5.Wait();
             foreach (var dic in task5.Result)
             {
@@ -156,7 +156,7 @@ namespace RedisqlTest
 
             List<Task> tasklist = new List<Task>();
             var stw = Stopwatch.StartNew();
-            int testCount = 10;
+            int testCount = 100000;
             for (var i = 0; i < testCount; i++)
             {
                 var valueDic = new Dictionary<string, string>() {
