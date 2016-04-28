@@ -36,7 +36,7 @@ namespace RedisqlTest
                 { "level", "1" },
                 { "exp", "100" }
             };
-            var task1 = redisql.TableRowInsertAsync("Account_Table", valueDic);
+            var task1 = redisql.TableInsertRowAsync("Account_Table", valueDic);
             task1.Wait();
             var id1 = task1.Result; // get table row _id
 
@@ -46,7 +46,7 @@ namespace RedisqlTest
                 { "level", "2" },
                 { "exp", "200" }
             };
-            var task2 = redisql.TableRowInsertAsync("Account_Table", valueDic);
+            var task2 = redisql.TableInsertRowAsync("Account_Table", valueDic);
             task2.Wait();
             var id2 = task2.Result;
 
@@ -56,7 +56,7 @@ namespace RedisqlTest
                 { "level", "1" },
                 { "exp", "300" }
             };
-            var task3 = redisql.TableRowInsertAsync("Account_Table", valueDic);
+            var task3 = redisql.TableInsertRowAsync("Account_Table", valueDic);
             task3.Wait();
             var id3 = task3.Result;
 
@@ -66,7 +66,7 @@ namespace RedisqlTest
                 { "name", "bruce" },
                 { "exp", "250" }
             };
-            redisql.TableRowUpdateAsync("Account_Table", valueDic).Wait();
+            redisql.TableUpdateRowAsync("Account_Table", valueDic).Wait();
 
             valueDic = new Dictionary<string, string>()
             {
@@ -74,12 +74,12 @@ namespace RedisqlTest
                 { "name", "jane" },
                 { "level", "2" }
             };
-            redisql.TableRowUpdateAsync("Account_Table", valueDic).Wait();
+            redisql.TableUpdateRowAsync("Account_Table", valueDic).Wait();
 
             //redisql.DeleteTableRow("Account_Table", "jane").Wait();
 
             Console.WriteLine("select _id, name, level from Account_Table where primaryKeyValue == bruce");
-            var task4 = redisql.TableRowSelectByPrimaryKeyColumnValueAsync(new List<string> { "_id", "name", "level" }, "Account_Table", "bruce");
+            var task4 = redisql.TableSelectRowByPrimaryKeyColumnValueAsync(new List<string> { "_id", "name", "level" }, "Account_Table", "bruce");
             task4.Wait();
             foreach (var e in task4.Result)
             {
@@ -89,7 +89,7 @@ namespace RedisqlTest
             Console.WriteLine();
 
             Console.WriteLine("select name, level from Account_Table where level == 1");
-            var task5 = redisql.TableRowSelectByMatchIndexColumnValueAsync(new List<string> { "name", "level" }, "Account_Table", "level", "1");
+            var task5 = redisql.TableSelectRowByMatchIndexColumnValueAsync(new List<string> { "name", "level" }, "Account_Table", "level", "1");
             task5.Wait();
             foreach (var dic in task5.Result)
             {
@@ -102,7 +102,7 @@ namespace RedisqlTest
             Console.WriteLine();
 
             Console.WriteLine("select name, level, exp from Account_Table where 0 <= exp <= 300");
-            var task6 = redisql.TableRowSelectByRangeIndexAsync(new List<string> { "name", "level", "exp" }, "Account_Table", "exp", "0", "300");
+            var task6 = redisql.TableSelectRowByRangeIndexAsync(new List<string> { "name", "level", "exp" }, "Account_Table", "exp", "0", "300");
             task6.Wait();
             foreach (var dic in task6.Result)
             {
@@ -115,7 +115,7 @@ namespace RedisqlTest
             Console.WriteLine();
 
             Console.WriteLine("select * from Account_Table where 250 <= exp <= 300");
-            var task7 = redisql.TableRowSelectByRangeIndexAsync(null, "Account_Table", "exp", "250", "300");
+            var task7 = redisql.TableSelectRowByRangeIndexAsync(null, "Account_Table", "exp", "250", "300");
             task7.Wait();
             foreach (var dic in task7.Result)
             {
@@ -128,7 +128,7 @@ namespace RedisqlTest
             Console.WriteLine();
 
             Console.WriteLine("select name, level from Account_Table where 1 <= level <= 2");
-            var task8 = redisql.TableRowSelectByRangeIndexAsync(new List<string> { "name", "level" }, "Account_Table", "level", "1", "2");
+            var task8 = redisql.TableSelectRowByRangeIndexAsync(new List<string> { "name", "level" }, "Account_Table", "level", "1", "2");
             task8.Wait();
             foreach (var dic in task8.Result)
             {
@@ -142,7 +142,7 @@ namespace RedisqlTest
 
         public void Test2()
         {
-            Redisql.Redisql redisql = new Redisql.Redisql("127.0.0.1", 6379, "");
+            Redisql.Redisql redisql = new Redisql.Redisql("192.168.25.4", 6379, "");
 
             List<Tuple<string, Type, bool, bool, object>> fieldList = new List<Tuple<string, Type, bool, bool, object>>()
             {
@@ -156,7 +156,7 @@ namespace RedisqlTest
 
             List<Task> tasklist = new List<Task>();
             var stw = Stopwatch.StartNew();
-            int testCount = 100000;
+            int testCount = 1000;
             for (var i = 0; i < testCount; i++)
             {
                 var valueDic = new Dictionary<string, string>() {
@@ -165,7 +165,7 @@ namespace RedisqlTest
                     { "exp", "100" },
                     { "profile", "this is test account" }
                 };
-                tasklist.Add(redisql.TableRowInsertAsync("Account_Table", valueDic));
+                tasklist.Add(redisql.TableInsertRowAsync("Account_Table", valueDic));
             }
 
             foreach (var task in tasklist) task.Wait();
@@ -173,6 +173,18 @@ namespace RedisqlTest
             Console.WriteLine("Total {0}ms  {1} per 1ms", stw.ElapsedMilliseconds, testCount / stw.ElapsedMilliseconds);
 
             GC.Collect();
+
+            
+            // select all rows
+            foreach (var row in redisql.TableSelectRowAll(null, "Account_Table"))
+            {
+                foreach (var e in row)
+                {
+                    Console.Write("{0}:{1} ", e.Key, e.Value);
+                }
+                Console.WriteLine("");
+            }
+            
 
             Console.WriteLine();
             stw.Restart();
@@ -243,7 +255,12 @@ namespace RedisqlTest
                     { "exp", "200" },
                     { "profile", "this is test account" }
                 };
-            tasklist.Add(redisql.TableRowInsertAsync("Account_Table", newRowDic));
+            tasklist.Add(redisql.TableInsertRowAsync("Account_Table", newRowDic));
+
+            Console.WriteLine();
+            
+            
+
             /*
             Console.WriteLine();
             stw.Restart();
@@ -288,7 +305,7 @@ namespace RedisqlTest
                 { "level", "1" },
                 { "exp", "100" }
             };
-            var task1 = redisql.TableRowInsertAsync("Account_Table", valueDic);
+            var task1 = redisql.TableInsertRowAsync("Account_Table", valueDic);
         }
     }
 }

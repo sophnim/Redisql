@@ -13,7 +13,7 @@ namespace Redisql
     public partial class Redisql
     {
         // add row to table and get auto incremented _id value
-        public async Task<Int64> TableRowInsertAsync(string tableName, Dictionary<string, string> insertRowColumnNameValuePairs)
+        public async Task<Int64> TableInsertRowAsync(string tableName, Dictionary<string, string> insertRowColumnNameValuePairs)
         {
             string key;
             string primaryKeyValue = null;
@@ -147,7 +147,7 @@ namespace Redisql
             }
         }
 
-        public async Task<bool> TableRowUpdateAsync(string tableName, Dictionary<string, string> updateColumnNameValuePairs)
+        public async Task<bool> TableUpdateRowAsync(string tableName, Dictionary<string, string> updateColumnNameValuePairs)
         {
             string key;
             bool enterTableLock = false;
@@ -258,7 +258,7 @@ namespace Redisql
             }
         }
 
-        public async Task<bool> TableRowDeleteAsync(string tableName, string primaryKeyValue)
+        public async Task<bool> TableDeleteRowAsync(string tableName, string primaryKeyValue)
         {
             bool enterTableLock = false;
             try
@@ -323,9 +323,11 @@ namespace Redisql
             }
         }
 
+        
+
         // select one row that matches with primary key column value. 
         // If selectColumnNames is null, select all columns in selected row, or select specified columns only.
-        public async Task<Dictionary<string, string>> TableRowSelectByPrimaryKeyColumnValueAsync(List<string> selectColumnNames, string tableName, string primaryKeyColumnValue)
+        public async Task<Dictionary<string, string>> TableSelectRowByPrimaryKeyColumnValueAsync(List<string> selectColumnNames, string tableName, string primaryKeyColumnValue)
         {
             var retdic = new Dictionary<string, string>();
             var ts = await TableGetSettingAsync(tableName);
@@ -382,7 +384,7 @@ namespace Redisql
         }
 
         // select all rows that matches match index column value
-        public async Task<List<Dictionary<string, string>>> TableRowSelectByMatchIndexColumnValueAsync(List<string> selectColumnNames, string tableName, string compareMatchIndexColumnName, string compareColumnValue)
+        public async Task<List<Dictionary<string, string>>> TableSelectRowByMatchIndexColumnValueAsync(List<string> selectColumnNames, string tableName, string compareMatchIndexColumnName, string compareColumnValue)
         {
             var retlist = new List<Dictionary<string, string>>();
             var ts = await TableGetSettingAsync(tableName);
@@ -464,7 +466,7 @@ namespace Redisql
         }
 
         // select all rows that has range index column values is between lowValue and highValue
-        public async Task<List<Dictionary<string, string>>> TableRowSelectByRangeIndexAsync(List<string> selectColumnNames, string tableName, string compareRangeIndexColumnName, string lowValue, string highValue)
+        public async Task<List<Dictionary<string, string>>> TableSelectRowByRangeIndexAsync(List<string> selectColumnNames, string tableName, string compareRangeIndexColumnName, string lowValue, string highValue)
         {
             var retlist = new List<Dictionary<string, string>>();
             var ts = await TableGetSettingAsync(tableName);

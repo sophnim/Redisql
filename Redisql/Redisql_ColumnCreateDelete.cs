@@ -19,7 +19,10 @@ namespace Redisql
             {
                 if (defaultValue == null)
                     return false;
-                
+
+                if (!CheckDataType(columnType, defaultValue.ToString()))
+                    return false;
+
                 var db = this.redis.GetDatabase();
 
                 var ts = await TableGetSettingAsync(tableName);

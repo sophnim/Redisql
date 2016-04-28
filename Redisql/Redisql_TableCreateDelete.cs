@@ -32,7 +32,7 @@ namespace Redisql
                 var pkvs = await db.SetMembersAsync(key);
                 foreach (var primaryKeyValue in pkvs)
                 {
-                    tasklist.Add(TableRowDeleteAsync(tableName, primaryKeyValue.ToString()));
+                    tasklist.Add(TableDeleteRowAsync(tableName, primaryKeyValue.ToString()));
                 }
 
                 // delete table schema 
@@ -73,8 +73,10 @@ namespace Redisql
             bool enterTableLock = false;
             try
             {
+                var ciflist = new List<Tuple<string, Type, bool, bool, object>>(columnInfoList);
+
                 // check input parameters 
-                foreach (var tpl in columnInfoList)
+                foreach (var tpl in ciflist)
                 {
                     if (tpl.Item1.Equals("_id"))
                         return false; // _id column name is reserved.  
@@ -100,7 +102,7 @@ namespace Redisql
                 }
 
                 // every table automatically generate _id column (auto increment)
-                columnInfoList.Insert(0, new Tuple<string, Type, bool, bool, object>("_id", typeof(Int64), false, false, null));
+                ciflist.Insert(0, new Tuple<string, Type, bool, bool, object>("_id", typeof(Int64), false, false, null));
 
                 enterTableLock = await TableLockEnterAsync(tableName, "");
 
@@ -120,7 +122,7 @@ namespace Redisql
                 // write table schema
                 var tableSchemaName = RedisKey.GetRedisKey_TableSchema(tableName);
                 int fieldIndex = 0;
-                foreach (var t in columnInfoList)
+                foreach (var t in ciflist)
                 {
                     bool pkFlag = false;
                     bool matchIndexFlag = t.Item3;
