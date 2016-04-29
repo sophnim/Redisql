@@ -111,8 +111,7 @@ namespace Redisql
                 }
             }
 
-            var ret = db.SetMembers(key);
-            foreach (var primaryKeyValue in ret)
+            foreach (var primaryKeyValue in db.SetScan(key, "*"))
             {
                 var retdic = new Dictionary<string, string>();
                 key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
@@ -145,6 +144,8 @@ namespace Redisql
 
                 yield return retdic;
             }
+
+            yield break;
         }
     }
 }

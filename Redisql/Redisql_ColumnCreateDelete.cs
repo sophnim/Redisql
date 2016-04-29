@@ -69,8 +69,10 @@ namespace Redisql
 
                 var tasklist = new List<Task<bool>>();
                 var key = RedisKey.GetRedisKey_TablePrimaryKeyList(tableName);
-                var pvks = await db.SetMembersAsync(key);
-                foreach (var primaryKeyValue in pvks)
+
+                //var pvks = await db.SetMembersAsync(key);
+                //foreach (var primaryKeyValue in pvks)
+                foreach (var primaryKeyValue in db.SetScan(key, "*"))
                 {
                     key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
                     tasklist.Add(db.HashSetAsync(key, cs.indexNumber.ToString(), defaultValue.ToString()));
@@ -136,13 +138,15 @@ namespace Redisql
 
                 var tasklist = new List<Task<RedisValue[]>>();
                 var key = RedisKey.GetRedisKey_TablePrimaryKeyList(tableName);
-                var pkvs = await db.SetMembersAsync(key);
+                //var pkvs = await db.SetMembersAsync(key);
 
                 // read column stored value
                 var rva = new RedisValue[2];
                 rva[0] = primaryKeyColumnIndex;
                 rva[1] = cs.indexNumber;
-                foreach (var primaryKeyValue in pkvs)
+
+                //foreach (var primaryKeyValue in pkvs)
+                foreach (var primaryKeyValue in db.SetScan(key, "*"))
                 {
                     key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
                     tasklist.Add(db.HashGetAsync(key, rva));

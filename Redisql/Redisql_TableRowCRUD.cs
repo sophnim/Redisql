@@ -395,7 +395,13 @@ namespace Redisql
                 throw new Exception(string.Format("Table '{0}' does not have '{1}' column", tableName, compareMatchIndexColumnName));
 
             var key = RedisKey.GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, compareColumnValue);
-            var pkvs = await db.SetMembersAsync(key);
+            //var pkvs = await db.SetMembersAsync(key);
+
+            var pkvs = new List<RedisValue>();
+            foreach (var rv in db.SetScan(key, "*"))
+            {
+                pkvs.Add(rv);
+            }
 
             if (null == selectColumnNames)
             {
