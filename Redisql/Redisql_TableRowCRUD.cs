@@ -329,233 +329,252 @@ namespace Redisql
         // If selectColumnNames is null, select all columns in selected row, or select specified columns only.
         public async Task<Dictionary<string, string>> TableSelectRowByPrimaryKeyColumnValueAsync(List<string> selectColumnNames, string tableName, string primaryKeyColumnValue)
         {
-            var retdic = new Dictionary<string, string>();
-            var ts = await TableGetSettingAsync(tableName);
-            var key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyColumnValue);
-            var db = this.redis.GetDatabase();
-
-            if (null == selectColumnNames)
+            try
             {
-                // read all column values
-                var ret = await db.HashGetAllAsync(key);
-                if (null != ret)
+                var retdic = new Dictionary<string, string>();
+                var ts = await TableGetSettingAsync(tableName);
+                var key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyColumnValue);
+                var db = this.redis.GetDatabase();
+
+                if (null == selectColumnNames)
                 {
-                    var len = ret.Length;
-                    for (var i = 0; i < len; i++)
+                    // read all column values
+                    var ret = await db.HashGetAllAsync(key);
+                    if (null != ret)
                     {
-                        var e = ret[i];
-                        string tableFieldName;
-                        if (ts.columnIndexNameDic.TryGetValue(e.Name.ToString(), out tableFieldName))
+                        var len = ret.Length;
+                        for (var i = 0; i < len; i++)
                         {
-                            retdic.Add(tableFieldName, e.Value.ToString());
+                            var e = ret[i];
+                            string tableFieldName;
+                            if (ts.columnIndexNameDic.TryGetValue(e.Name.ToString(), out tableFieldName))
+                            {
+                                retdic.Add(tableFieldName, e.Value.ToString());
+                            }
                         }
                     }
                 }
-            }
-            else
-            {
-                // read specified column values
-                var len = selectColumnNames.Count;
-                RedisValue[] rv = new RedisValue[len];
-                for (var i = 0; i < len; i++)
+                else
                 {
-                    ColumnSetting cs;
-                    if (ts.tableSchemaDic.TryGetValue(selectColumnNames[i], out cs))
-                    {
-                        rv[i] = cs.indexNumber.ToString();
-                    }
-                    else
-                    {
-                        // not existing column name
-                        throw new Exception(string.Format("Table '{0}' does not have '{1}' column", tableName, selectColumnNames[i]));
-                    }
-                }
-                var ret = await db.HashGetAsync(key, rv);
-                if (null != ret)
-                {
+                    // read specified column values
+                    var len = selectColumnNames.Count;
+                    RedisValue[] rv = new RedisValue[len];
                     for (var i = 0; i < len; i++)
                     {
-                        retdic.Add(selectColumnNames[i], ret[i].ToString());
+                        ColumnSetting cs;
+                        if (ts.tableSchemaDic.TryGetValue(selectColumnNames[i], out cs))
+                        {
+                            rv[i] = cs.indexNumber.ToString();
+                        }
+                        else
+                        {
+                            // not existing column name
+                            throw new Exception(string.Format("Table '{0}' does not have '{1}' column", tableName, selectColumnNames[i]));
+                        }
+                    }
+                    var ret = await db.HashGetAsync(key, rv);
+                    if (null != ret)
+                    {
+                        for (var i = 0; i < len; i++)
+                        {
+                            retdic.Add(selectColumnNames[i], ret[i].ToString());
+                        }
                     }
                 }
-            }
 
-            return retdic;
+                return retdic;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         // select all rows that matches match index column value
         public async Task<List<Dictionary<string, string>>> TableSelectRowByMatchIndexColumnValueAsync(List<string> selectColumnNames, string tableName, string compareMatchIndexColumnName, string compareColumnValue)
         {
-            var retlist = new List<Dictionary<string, string>>();
-            var ts = await TableGetSettingAsync(tableName);
-            var db = this.redis.GetDatabase();
-
-            ColumnSetting cs;
-            if (!ts.tableSchemaDic.TryGetValue(compareMatchIndexColumnName, out cs))
-                throw new Exception(string.Format("Table '{0}' does not have '{1}' column", tableName, compareMatchIndexColumnName));
-
-            var key = RedisKey.GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, compareColumnValue);
-            //var pkvs = await db.SetMembersAsync(key);
-
-            var pkvs = new List<RedisValue>();
-            foreach (var rv in db.SetScan(key, "*"))
+            try
             {
-                pkvs.Add(rv);
-            }
+                var retlist = new List<Dictionary<string, string>>();
+                var ts = await TableGetSettingAsync(tableName);
+                var db = this.redis.GetDatabase();
 
-            if (null == selectColumnNames)
-            {
-                // read all columns
-                var tasklist = new List<Task<HashEntry[]>>();
-                foreach (var pk in pkvs)
+                ColumnSetting cs;
+                if (!ts.tableSchemaDic.TryGetValue(compareMatchIndexColumnName, out cs))
+                    throw new Exception(string.Format("Table '{0}' does not have '{1}' column", tableName, compareMatchIndexColumnName));
+
+                var key = RedisKey.GetRedisKey_TableMatchIndexColumn(ts.tableID, cs.indexNumber, compareColumnValue);
+                var pkvs = new List<RedisValue>();
+                foreach (var rv in db.SetScan(key, "*"))
                 {
-                    key = RedisKey.GetRedisKey_TableRow(ts.tableID, pk.ToString());
-                    tasklist.Add(db.HashGetAllAsync(key));
+                    pkvs.Add(rv);
                 }
 
-                foreach (var task in tasklist)
+                if (null == selectColumnNames)
                 {
-                    await task;
-                    var heArray = task.Result;
-                    var dic = new Dictionary<string, string>();
-                    foreach (var he in heArray)
+                    // read all columns
+                    var tasklist = new List<Task<HashEntry[]>>();
+                    foreach (var pk in pkvs)
                     {
-                        string tableFieldName;
-                        if (ts.columnIndexNameDic.TryGetValue(he.Name.ToString(), out tableFieldName))
+                        key = RedisKey.GetRedisKey_TableRow(ts.tableID, pk.ToString());
+                        tasklist.Add(db.HashGetAllAsync(key));
+                    }
+
+                    foreach (var task in tasklist)
+                    {
+                        await task;
+                        var heArray = task.Result;
+                        var dic = new Dictionary<string, string>();
+                        foreach (var he in heArray)
                         {
-                            dic.Add(tableFieldName, he.Value.ToString());
+                            string tableFieldName;
+                            if (ts.columnIndexNameDic.TryGetValue(he.Name.ToString(), out tableFieldName))
+                            {
+                                dic.Add(tableFieldName, he.Value.ToString());
+                            }
                         }
-                    }
-                    retlist.Add(dic);
-                }
-            }
-            else
-            {
-                // read specified columns
-                var len = selectColumnNames.Count;
-                var rva = new RedisValue[len];
-                for (var i = 0; i < len; i++)
-                {
-                    if (ts.tableSchemaDic.TryGetValue(selectColumnNames[i], out cs))
-                    {
-                        rva[i] = cs.indexNumber.ToString();
-                    }
-                    else
-                    {
-                        // not existing column
-                        throw new Exception(string.Format("Table '{0}' does not have '{1}' column", tableName, selectColumnNames[i]));
+                        retlist.Add(dic);
                     }
                 }
-
-                var tasklist = new List<Task<RedisValue[]>>();
-                foreach (var pk in pkvs)
+                else
                 {
-                    key = RedisKey.GetRedisKey_TableRow(ts.tableID, pk.ToString());
-                    tasklist.Add(db.HashGetAsync(key, rva));
-                }
-
-                foreach (var task in tasklist)
-                {
-                    await task;
-                    rva = task.Result;
-                    var dic = new Dictionary<string, string>();
-
+                    // read specified columns
+                    var len = selectColumnNames.Count;
+                    var rva = new RedisValue[len];
                     for (var i = 0; i < len; i++)
                     {
-                        dic.Add(selectColumnNames[i], rva[i].ToString());
+                        if (ts.tableSchemaDic.TryGetValue(selectColumnNames[i], out cs))
+                        {
+                            rva[i] = cs.indexNumber.ToString();
+                        }
+                        else
+                        {
+                            // not existing column
+                            throw new Exception(string.Format("Table '{0}' does not have '{1}' column", tableName, selectColumnNames[i]));
+                        }
                     }
-                    retlist.Add(dic);
-                }
-            }
 
-            return retlist;
+                    var tasklist = new List<Task<RedisValue[]>>();
+                    foreach (var pk in pkvs)
+                    {
+                        key = RedisKey.GetRedisKey_TableRow(ts.tableID, pk.ToString());
+                        tasklist.Add(db.HashGetAsync(key, rva));
+                    }
+
+                    foreach (var task in tasklist)
+                    {
+                        await task;
+                        rva = task.Result;
+                        var dic = new Dictionary<string, string>();
+
+                        for (var i = 0; i < len; i++)
+                        {
+                            dic.Add(selectColumnNames[i], rva[i].ToString());
+                        }
+                        retlist.Add(dic);
+                    }
+                }
+
+                return retlist;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         // select all rows that has range index column values is between lowValue and highValue
         public async Task<List<Dictionary<string, string>>> TableSelectRowByRangeIndexAsync(List<string> selectColumnNames, string tableName, string compareRangeIndexColumnName, string lowValue, string highValue)
         {
-            var retlist = new List<Dictionary<string, string>>();
-            var ts = await TableGetSettingAsync(tableName);
-            var db = this.redis.GetDatabase();
-
-            ColumnSetting cs;
-            if (!ts.tableSchemaDic.TryGetValue(compareRangeIndexColumnName, out cs))
+            try
             {
-                return retlist;
-            }
+                var retlist = new List<Dictionary<string, string>>();
+                var ts = await TableGetSettingAsync(tableName);
+                var db = this.redis.GetDatabase();
 
-            var lv = ConvertToScore(cs.dataType, lowValue);
-            var hv = ConvertToScore(cs.dataType, highValue);
-
-            var key = RedisKey.GetRedisKey_TableRangeIndexColumn(ts.tableID, cs.indexNumber);
-            var primaryKeyValues = await db.SortedSetRangeByScoreAsync(key, lv, hv);
-
-            if (null == selectColumnNames)
-            {
-                // read all columns
-                List<Task<HashEntry[]>> tasklist = new List<Task<HashEntry[]>>();
-                foreach (var primaryKeyValue in primaryKeyValues)
+                ColumnSetting cs;
+                if (!ts.tableSchemaDic.TryGetValue(compareRangeIndexColumnName, out cs))
                 {
-                    key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
-                    tasklist.Add(db.HashGetAllAsync(key));
+                    return retlist;
                 }
 
-                foreach (var task in tasklist)
+                var lv = ConvertToScore(cs.dataType, lowValue);
+                var hv = ConvertToScore(cs.dataType, highValue);
+
+                var key = RedisKey.GetRedisKey_TableRangeIndexColumn(ts.tableID, cs.indexNumber);
+                var primaryKeyValues = await db.SortedSetRangeByScoreAsync(key, lv, hv);
+
+                if (null == selectColumnNames)
                 {
-                    await task;
-                    var heArray = task.Result;
-                    var dic = new Dictionary<string, string>();
-                    foreach (var he in heArray)
+                    // read all columns
+                    List<Task<HashEntry[]>> tasklist = new List<Task<HashEntry[]>>();
+                    foreach (var primaryKeyValue in primaryKeyValues)
                     {
-                        string tableFieldName;
-                        if (ts.columnIndexNameDic.TryGetValue(he.Name.ToString(), out tableFieldName))
+                        key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
+                        tasklist.Add(db.HashGetAllAsync(key));
+                    }
+
+                    foreach (var task in tasklist)
+                    {
+                        await task;
+                        var heArray = task.Result;
+                        var dic = new Dictionary<string, string>();
+                        foreach (var he in heArray)
                         {
-                            dic.Add(tableFieldName, he.Value.ToString());
+                            string tableFieldName;
+                            if (ts.columnIndexNameDic.TryGetValue(he.Name.ToString(), out tableFieldName))
+                            {
+                                dic.Add(tableFieldName, he.Value.ToString());
+                            }
                         }
-                    }
-                    retlist.Add(dic);
-                }
-            }
-            else
-            {
-                // read specified columns
-                var len = selectColumnNames.Count;
-                var rva = new RedisValue[len];
-                for (var i = 0; i < len; i++)
-                {
-                    if (ts.tableSchemaDic.TryGetValue(selectColumnNames[i], out cs))
-                    {
-                        rva[i] = cs.indexNumber.ToString();
-                    }
-                    else
-                    {
-                        // not existing column
-                        throw new Exception(string.Format("Table '{0}' does not have '{1}' column", tableName, selectColumnNames[i]));
+                        retlist.Add(dic);
                     }
                 }
-
-                var tasklist = new List<Task<RedisValue[]>>();
-                foreach (var primaryKeyValue in primaryKeyValues)
+                else
                 {
-                    key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
-                    tasklist.Add(db.HashGetAsync(key, rva));
-                }
-
-                foreach (var task in tasklist)
-                {
-                    await task;
-                    rva = task.Result;
-                    var dic = new Dictionary<string, string>();
-
+                    // read specified columns
+                    var len = selectColumnNames.Count;
+                    var rva = new RedisValue[len];
                     for (var i = 0; i < len; i++)
                     {
-                        dic.Add(selectColumnNames[i], rva[i].ToString());
+                        if (ts.tableSchemaDic.TryGetValue(selectColumnNames[i], out cs))
+                        {
+                            rva[i] = cs.indexNumber.ToString();
+                        }
+                        else
+                        {
+                            // not existing column
+                            throw new Exception(string.Format("Table '{0}' does not have '{1}' column", tableName, selectColumnNames[i]));
+                        }
                     }
-                    retlist.Add(dic);
-                }
-            }
 
-            return retlist;
+                    var tasklist = new List<Task<RedisValue[]>>();
+                    foreach (var primaryKeyValue in primaryKeyValues)
+                    {
+                        key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue.ToString());
+                        tasklist.Add(db.HashGetAsync(key, rva));
+                    }
+
+                    foreach (var task in tasklist)
+                    {
+                        await task;
+                        rva = task.Result;
+                        var dic = new Dictionary<string, string>();
+
+                        for (var i = 0; i < len; i++)
+                        {
+                            dic.Add(selectColumnNames[i], rva[i].ToString());
+                        }
+                        retlist.Add(dic);
+                    }
+                }
+
+                return retlist;
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }

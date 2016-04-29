@@ -29,8 +29,6 @@ namespace Redisql
 
                 // delete every table rows
                 var tasklist = new List<Task<bool>>();
-                //var pkvs = await db.SetMembersAsync(key);
-                //foreach (var primaryKeyValue in pkvs)
                 foreach (var primaryKeyValue in db.SetScan(key, "*"))
                 {
                     tasklist.Add(TableDeleteRowAsync(tableName, primaryKeyValue.ToString()));

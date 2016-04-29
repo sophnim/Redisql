@@ -76,68 +76,105 @@ namespace RedisqlTest
 
             //redisql.DeleteTableRow("Account_Table", "jane").Wait();
 
-            Console.WriteLine("select _id, name, level from Account_Table where primaryKeyValue == bruce");
-            var task4 = redisql.TableSelectRowByPrimaryKeyColumnValueAsync(new List<string> { "_id", "name", "level" }, "Account_Table", "bruce");
-            task4.Wait();
-            foreach (var e in task4.Result)
+            
+            Task.Run(() =>
             {
-                Console.Write("{0} : {1} ", e.Key, e.Value);
-            }
-            Console.WriteLine("\n\n");
-
-            Console.WriteLine("select name, level from Account_Table where level == 1");
-            var task5 = redisql.TableSelectRowByMatchIndexColumnValueAsync(new List<string> { "name", "level" }, "Account_Table", "level", "1");
-            task5.Wait();
-            foreach (var dic in task5.Result)
-            {
-                foreach (var e in dic)
+                while (true)
                 {
-                    Console.Write("{0} : {1} ", e.Key, e.Value);
+                    Console.WriteLine("select _id, name, level from Account_Table where primaryKeyValue == bruce");
+                    var task4 = redisql.TableSelectRowByPrimaryKeyColumnValueAsync(new List<string> { "_id", "name", "level" }, "Account_Table", "bruce");
+                    task4.Wait();
+                    foreach (var e in task4.Result)
+                    {
+                        Console.Write("{0} : {1} ", e.Key, e.Value);
+                    }
+                    Console.WriteLine("\n\n");
                 }
-                Console.WriteLine();
-            }
+            });
 
-            Console.WriteLine("\n\n");
 
-            Console.WriteLine("select name, level, exp from Account_Table where 0 <= exp <= 300");
-            var task6 = redisql.TableSelectRowByRangeIndexAsync(new List<string> { "name", "level", "exp" }, "Account_Table", "exp", "0", "300");
-            task6.Wait();
-            foreach (var dic in task6.Result)
+            Task.Run(() =>
             {
-                foreach (var e in dic)
+                while (true)
                 {
-                    Console.Write("{0} : {1} ", e.Key, e.Value);
+                    Console.WriteLine("select name, level from Account_Table where level == 1");
+                    var task5 = redisql.TableSelectRowByMatchIndexColumnValueAsync(new List<string> { "name", "level" }, "Account_Table", "level", "1");
+                    task5.Wait();
+                    foreach (var dic in task5.Result)
+                    {
+                        foreach (var e in dic)
+                        {
+                            Console.Write("{0} : {1} ", e.Key, e.Value);
+                        }
+                        Console.WriteLine();
+                    }
+
+                    Console.WriteLine("\n\n");
                 }
-                Console.WriteLine();
-            }
+            });
 
-            Console.WriteLine("\n\n");
 
-            Console.WriteLine("select * from Account_Table where 250 <= exp <= 300");
-            var task7 = redisql.TableSelectRowByRangeIndexAsync(null, "Account_Table", "exp", "250", "300");
-            task7.Wait();
-            foreach (var dic in task7.Result)
+            Task.Run(() =>
             {
-                foreach (var e in dic)
+                while (true)
                 {
-                    Console.Write("{0} : {1} ", e.Key, e.Value);
+                    Console.WriteLine("select name, level, exp from Account_Table where 0 <= exp <= 300");
+                    var task6 = redisql.TableSelectRowByRangeIndexAsync(new List<string> { "name", "level", "exp" }, "Account_Table", "exp", "0", "300");
+                    task6.Wait();
+                    foreach (var dic in task6.Result)
+                    {
+                        foreach (var e in dic)
+                        {
+                            Console.Write("{0} : {1} ", e.Key, e.Value);
+                        }
+                        Console.WriteLine();
+                    }
+
+                    Console.WriteLine("\n\n");
                 }
-                Console.WriteLine();
-            }
+            });
 
-            Console.WriteLine("\n\n");
 
-            Console.WriteLine("select name, level from Account_Table where 1 <= level <= 2");
-            var task8 = redisql.TableSelectRowByRangeIndexAsync(new List<string> { "name", "level" }, "Account_Table", "level", "1", "2");
-            task8.Wait();
-            foreach (var dic in task8.Result)
+            Task.Run(() =>
             {
-                foreach (var e in dic)
+                while (true)
                 {
-                    Console.Write("{0} : {1} ", e.Key, e.Value);
+                    Console.WriteLine("select * from Account_Table where 250 <= exp <= 300");
+                    var task7 = redisql.TableSelectRowByRangeIndexAsync(null, "Account_Table", "exp", "250", "300");
+                    task7.Wait();
+                    foreach (var dic in task7.Result)
+                    {
+                        foreach (var e in dic)
+                        {
+                            Console.Write("{0} : {1} ", e.Key, e.Value);
+                        }
+                        Console.WriteLine();
+                    }
+
+                    Console.WriteLine("\n\n");
                 }
-                Console.WriteLine();
-            }
+            });
+            
+
+            Task.Run(() =>
+            {
+                while (true)
+                {
+                    Console.WriteLine("select name, level from Account_Table where 1 <= level <= 2");
+                    var task8 = redisql.TableSelectRowByRangeIndexAsync(new List<string> { "name", "level" }, "Account_Table", "level", "1", "2");
+                    task8.Wait();
+                    foreach (var dic in task8.Result)
+                    {
+                        foreach (var e in dic)
+                        {
+                            Console.Write("{0} : {1} ", e.Key, e.Value);
+                        }
+                        Console.WriteLine();
+                    }
+
+                    Console.WriteLine("\n\n");
+                }
+            });
 
             Console.WriteLine("\n\nEnd of Test");
         }

@@ -85,6 +85,7 @@ namespace Redisql
         // select all rows in table
         public IEnumerable<Dictionary<string, string>> TableSelectRowAll(List<string> selectColumnNames, string tableName)
         {
+
             var ts = WaitTaskAndReturnTaskResult<TableSetting>(TableGetSettingAsync(tableName));
 
             var key = RedisKey.GetRedisKey_TablePrimaryKeyList(tableName);
