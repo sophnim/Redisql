@@ -8,13 +8,13 @@ using System.Collections.Concurrent;
 
 using StackExchange.Redis;
 
-namespace Redisql
+namespace Redisql.Core
 {
-    public partial class Redisql
+    public partial class RedisqlCore
     {
-        public bool TableCreate(string tableName, string primaryKeyColumnName, List<ColumnConfig> columnConfigList)
+        public bool TableCreate(string tableName, List<ColumnConfig> columnConfigList, string primaryKeyColumnName)
         {
-            return WaitTaskAndReturnTaskResult<bool>(TableCreateAsync(tableName, primaryKeyColumnName, columnConfigList));
+            return WaitTaskAndReturnTaskResult<bool>(TableCreateAsync(tableName, columnConfigList, primaryKeyColumnName));
         }
 
         public bool TableDelete(string tableName)

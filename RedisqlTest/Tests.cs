@@ -5,185 +5,111 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Diagnostics;
 
-using Redisql;
+using Redisql.Core;
+using Redisql.Helper;
 
 namespace RedisqlTest
 {
     public class Tests
     {
-        public void Test1()
+        RedisqlCore redisql;
+
+        public Tests()
         {
-            Redisql.Redisql redisql = new Redisql.Redisql("127.0.0.1", 6379, "");
+            this.redisql = new RedisqlCore("127.0.0.1", 6379, "");
+        }
 
-            var task0 = redisql.TableGetSettingAsync("Account_Table");
-            task0.Wait();
-            var ts = task0.Result;
-
+        public async void AsyncTest()
+        {
+            // Prepare to create table : construct table column config list
             var columnConfigList = new List<ColumnConfig>()
             {
-                new ColumnConfig("name", typeof(String), null), 
-                new ColumnConfig("level", typeof(Int32), 1), 
-                new ColumnConfig("exp", typeof(Int32), 0), 
-                new ColumnConfig("money", typeof(Int32), 1000), 
-                new ColumnConfig("time", typeof(DateTime), "now") 
+                new ColumnConfig("name", typeof(String), null, true, false),     // Column 'name', String type, default null means user must specify the column value(no default value).
+                new ColumnConfig("level", typeof(Int32), 1, true, true),        // Column 'level', Int32 type, default 1
+                new ColumnConfig("exp", typeof(Int32), 0, true, true),          // Column 'exp', Int32 type, default 0
+                new ColumnConfig("money", typeof(Int32), 1000, false, true),     // Column 'money', Int32 type, default 1000
+                new ColumnConfig("time", typeof(DateTime), "now", false, true)   // Column 'time', DateTime type, default "now" means current local time("utcnow" will have a current utc time)
             };
-            // Create Table
-            redisql.TableCreateAsync("Account_Table", "name", columnConfigList).Wait(); 
 
+            // Create table : table name: Account_Table, primary key: name
+            await this.redisql.TableCreateAsync("Account_Table", columnConfigList, "name"); 
+
+            // prepare to insert table row: column name - value dictionary
             var valueDic = new Dictionary<string, string>()
             {
                 { "name", "bruce" },
                 { "level", "1" },
                 { "exp", "100" }
             };
-            var task1 = redisql.TableInsertRowAsync("Account_Table", valueDic);
-            task1.Wait();
-            var id1 = task1.Result; // get table row _id
+            // insert row to Account_Table and get row id. row id is auto-increment generated value.
+            var rowid = await this.redisql.TableInsertRowAsync("Account_Table", valueDic); 
 
+            // insert another row : unspecified column will be filled with default value
             valueDic = new Dictionary<string, string>()
             {
                 { "name", "jane" },
                 { "level", "2" },
                 { "exp", "200" }
             };
-            var task2 = redisql.TableInsertRowAsync("Account_Table", valueDic);
-            task2.Wait();
-            var id2 = task2.Result;
-
+            await this.redisql.TableInsertRowAsync("Account_Table", valueDic);
+            
+            // insert another row
             valueDic = new Dictionary<string, string>()
             {
                 { "name", "tom" },
                 { "level", "1" },
                 { "exp", "300" }
             };
-            var task3 = redisql.TableInsertRowAsync("Account_Table", valueDic);
-            task3.Wait();
-            var id3 = task3.Result;
-
+            await this.redisql.TableInsertRowAsync("Account_Table", valueDic);
+            
+            // insert another row
             valueDic = new Dictionary<string, string>()
             {
                 { "name", "bruce" },
                 { "exp", "250" }
             };
-            redisql.TableUpdateRowAsync("Account_Table", valueDic).Wait();
+            await this.redisql.TableUpdateRowAsync("Account_Table", valueDic);
 
+            // insert another row
             valueDic = new Dictionary<string, string>()
             {
                 { "name", "jane" },
                 { "level", "2" }
             };
-            redisql.TableUpdateRowAsync("Account_Table", valueDic).Wait();
+            await this.redisql.TableUpdateRowAsync("Account_Table", valueDic);
 
-            //redisql.DeleteTableRow("Account_Table", "jane").Wait();
+            // select a row that have a primary key value "bruce"
+            Console.WriteLine("select * from Account_Table where name = bruce");
+            var row = await redisql.TableSelectRowByPrimaryKeyColumnValueAsync(null, "Account_Table", "bruce");
+            RedisqlHelper.PrintRow(row);
 
+            Console.WriteLine("");
+
+            // specify column name to select
+            Console.WriteLine("select _id, name, level from Account_Table where name = bruce");
+            row = await redisql.TableSelectRowByPrimaryKeyColumnValueAsync(new List<string> { "_id", "name", "level" }, "Account_Table", "bruce");
+            RedisqlHelper.PrintRow(row);
+
+            Console.WriteLine("");
+
+            // select rows that matches value with match index column
+            Console.WriteLine("select * from Account_Table where level == 1");
+            var rows = await redisql.TableSelectRowByMatchIndexColumnValueAsync(null, "Account_Table", "level", "1");
+            RedisqlHelper.PrintRows(rows);
+
+            Console.WriteLine("");
+
+            // select rows that has a proper range column value
+            Console.WriteLine("select * from Account_Table where 250 <= exp <= 300");
+            rows = await redisql.TableSelectRowByRangeIndexAsync(null, "Account_Table", "exp", "250", "300");
+            RedisqlHelper.PrintRows(rows);
             
-            Task.Run(() =>
-            {
-                while (true)
-                {
-                    Console.WriteLine("select _id, name, level from Account_Table where primaryKeyValue == bruce");
-                    var task4 = redisql.TableSelectRowByPrimaryKeyColumnValueAsync(new List<string> { "_id", "name", "level" }, "Account_Table", "bruce");
-                    task4.Wait();
-                    foreach (var e in task4.Result)
-                    {
-                        Console.Write("{0} : {1} ", e.Key, e.Value);
-                    }
-                    Console.WriteLine("\n\n");
-                }
-            });
-
-
-            Task.Run(() =>
-            {
-                while (true)
-                {
-                    Console.WriteLine("select name, level from Account_Table where level == 1");
-                    var task5 = redisql.TableSelectRowByMatchIndexColumnValueAsync(new List<string> { "name", "level" }, "Account_Table", "level", "1");
-                    task5.Wait();
-                    foreach (var dic in task5.Result)
-                    {
-                        foreach (var e in dic)
-                        {
-                            Console.Write("{0} : {1} ", e.Key, e.Value);
-                        }
-                        Console.WriteLine();
-                    }
-
-                    Console.WriteLine("\n\n");
-                }
-            });
-
-
-            Task.Run(() =>
-            {
-                while (true)
-                {
-                    Console.WriteLine("select name, level, exp from Account_Table where 0 <= exp <= 300");
-                    var task6 = redisql.TableSelectRowByRangeIndexAsync(new List<string> { "name", "level", "exp" }, "Account_Table", "exp", "0", "300");
-                    task6.Wait();
-                    foreach (var dic in task6.Result)
-                    {
-                        foreach (var e in dic)
-                        {
-                            Console.Write("{0} : {1} ", e.Key, e.Value);
-                        }
-                        Console.WriteLine();
-                    }
-
-                    Console.WriteLine("\n\n");
-                }
-            });
-
-
-            Task.Run(() =>
-            {
-                while (true)
-                {
-                    Console.WriteLine("select * from Account_Table where 250 <= exp <= 300");
-                    var task7 = redisql.TableSelectRowByRangeIndexAsync(null, "Account_Table", "exp", "250", "300");
-                    task7.Wait();
-                    foreach (var dic in task7.Result)
-                    {
-                        foreach (var e in dic)
-                        {
-                            Console.Write("{0} : {1} ", e.Key, e.Value);
-                        }
-                        Console.WriteLine();
-                    }
-
-                    Console.WriteLine("\n\n");
-                }
-            });
-            
-
-            Task.Run(() =>
-            {
-                while (true)
-                {
-                    Console.WriteLine("select name, level from Account_Table where 1 <= level <= 2");
-                    var task8 = redisql.TableSelectRowByRangeIndexAsync(new List<string> { "name", "level" }, "Account_Table", "level", "1", "2");
-                    task8.Wait();
-                    foreach (var dic in task8.Result)
-                    {
-                        foreach (var e in dic)
-                        {
-                            Console.Write("{0} : {1} ", e.Key, e.Value);
-                        }
-                        Console.WriteLine();
-                    }
-
-                    Console.WriteLine("\n\n");
-                }
-            });
-
             Console.WriteLine("\n\nEnd of Test");
         }
 
 
         public void Test2()
         {
-            Redisql.Redisql redisql = new Redisql.Redisql("127.0.0.1", 6379, "");
-
             var columnConfigList = new List<ColumnConfig>()
             {
                 new ColumnConfig("name", typeof(String), null), 
@@ -192,7 +118,7 @@ namespace RedisqlTest
                 new ColumnConfig("profile", typeof(String), "") 
             };
             // Create Table
-            redisql.TableCreateAsync("Account_Table", "name", columnConfigList).Wait();
+            this.redisql.TableCreateAsync("Account_Table", columnConfigList, "name").Wait();
 
             List<Task> tasklist = new List<Task>();
             var stw = Stopwatch.StartNew();
@@ -287,7 +213,7 @@ namespace RedisqlTest
             stw.Restart();
 
             Console.WriteLine("Re-Create Table");
-            redisql.TableCreateAsync("Account_Table", "_id", columnConfigList).Wait();
+            redisql.TableCreateAsync("Account_Table", columnConfigList, "_id").Wait();
 
             var newRowDic = new Dictionary<string, string>() {
                     { "name", "mike" },
@@ -322,8 +248,6 @@ namespace RedisqlTest
 
         public void Test3()
         {
-            Redisql.Redisql redisql = new Redisql.Redisql("127.0.0.1", 6379, "");
-
             var task0 = redisql.TableGetSettingAsync("Account_Table");
             task0.Wait();
             var ts = task0.Result;
@@ -337,7 +261,7 @@ namespace RedisqlTest
                 new ColumnConfig("time", typeof(DateTime), "now"), 
             };
             // Create Table
-            redisql.TableCreateAsync("Account_Table", "_id", columnConfigList).Wait(); // primary key field is '_id'. _id is auto generated field that auto incremented when insert.
+            redisql.TableCreateAsync("Account_Table", columnConfigList, "_id").Wait(); // primary key field is '_id'. _id is auto generated field that auto incremented when insert.
 
             var stw = Stopwatch.StartNew();
 

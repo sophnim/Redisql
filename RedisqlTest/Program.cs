@@ -14,7 +14,7 @@ namespace RedisqlTest
         static void Main(string[] args)
         {
             Tests tests = new Tests();
-            tests.Test3();
+            tests.AsyncTest();
 
             Console.ReadLine();
         }

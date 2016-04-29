@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Redisql
+namespace Redisql.Core
 {
     // List<Tuple<string,Type,bool,bool,object>> column list : columnName, columnType, make matchIndex, make rangeIndex, defaultValue
     //public async Task<bool> TableCreateAsync(string tableName, string primaryKeyColumnName, List<Tuple<string, Type, bool, bool, object>> columnInfoList)

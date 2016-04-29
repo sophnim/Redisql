@@ -8,9 +8,9 @@ using System.Collections.Concurrent;
 
 using StackExchange.Redis;
 
-namespace Redisql
+namespace Redisql.Core
 {
-    public partial class Redisql
+    public partial class RedisqlCore
     {
         public async Task<bool> TableCreateNewColumnAsync(string tableName, string columnName, Type columnType, bool makeMatchIndex, bool makeRangeIndex, object defaultValue)
         {
@@ -105,7 +105,7 @@ namespace Redisql
             finally
             {
                 if (enterTableLock)
-                    TableLockExit(tableName, "");
+                    await TableLockExit(tableName, "");
             }
         }
 
@@ -196,7 +196,7 @@ namespace Redisql
             finally
             {
                 if (enterTableLock)
-                    TableLockExit(tableName, "");
+                    await TableLockExit(tableName, "");
             }
         }
     }

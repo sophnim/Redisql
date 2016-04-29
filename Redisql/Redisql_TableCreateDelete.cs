@@ -8,11 +8,11 @@ using System.Collections.Concurrent;
 
 using StackExchange.Redis;
 
-namespace Redisql
+namespace Redisql.Core
 {
-    public partial class Redisql
+    public partial class RedisqlCore
     {
-        public async Task<bool> TableCreateAsync(string tableName, string primaryKeyColumnName, List<ColumnConfig> columnConfigList)
+        public async Task<bool> TableCreateAsync(string tableName, List<ColumnConfig> columnConfigList, string primaryKeyColumnName)
         {
             bool enterTableLock = false;
             try
@@ -91,7 +91,7 @@ namespace Redisql
             finally
             {
                 if (enterTableLock)
-                    TableLockExit(tableName, "");
+                    await TableLockExit(tableName, "");
             }
         }
 
@@ -145,7 +145,7 @@ namespace Redisql
             finally
             {
                 if (enterTableLock)
-                    TableLockExit(tableName, "");
+                    await TableLockExit(tableName, "");
             }
         }
     }

@@ -8,16 +8,14 @@ using System.Collections.Concurrent;
 
 using StackExchange.Redis;
 
-namespace Redisql
+namespace Redisql.Core
 {
-    
-
-    public partial class Redisql
+    public partial class RedisqlCore
     {
         private ConcurrentDictionary<string, TableSetting> tableSettingDic = new ConcurrentDictionary<string, TableSetting>();
         private ConnectionMultiplexer redis;
 
-        public Redisql(string redisIp, Int32 redisPort, string redisPassword)
+        public RedisqlCore(string redisIp, Int32 redisPort, string redisPassword)
         {
             string connString = null;
             if (string.IsNullOrEmpty(redisPassword))
@@ -26,11 +24,10 @@ namespace Redisql
             }
             else
             {
-
+                connString = string.Format("{0}:{1},password={2}", redisIp, redisPort.ToString(), redisPassword);
             }
 
             this.redis = ConnectionMultiplexer.Connect(connString);
-            Console.WriteLine("Redis Connected");
         }
 
         private Double ConvertToScore(Type type, string value)

@@ -46,6 +46,7 @@
   <ItemGroup>
     <Compile Include="Consts.cs" />
     <Compile Include="Enums.cs" />
+    <Compile Include="Helper.cs" />
     <Compile Include="RedisKey.cs" />
     <Compile Include="Redisql.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

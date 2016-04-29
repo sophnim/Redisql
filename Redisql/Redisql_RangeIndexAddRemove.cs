@@ -8,9 +8,9 @@ using System.Collections.Concurrent;
 
 using StackExchange.Redis;
 
-namespace Redisql
+namespace Redisql.Core
 {
-    public partial class Redisql
+    public partial class RedisqlCore
     {
         // Add range index to not sort-indexed existing table field
         public async Task<bool> TableAddRangeIndexAsync(string tableName, string columnName)
@@ -74,7 +74,7 @@ namespace Redisql
             finally
             {
                 if (enterTableLock)
-                    TableLockExit(tableName, "");
+                    await TableLockExit(tableName, "");
             }
         }
 
@@ -140,7 +140,7 @@ namespace Redisql
             finally
             {
                 if (enterTableLock)
-                    TableLockExit(tableName, "");
+                    await TableLockExit(tableName, "");
             }
         }
     }

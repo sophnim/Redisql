@@ -8,9 +8,9 @@ using System.Collections.Concurrent;
 
 using StackExchange.Redis;
 
-namespace Redisql
+namespace Redisql.Core
 {
-    public partial class Redisql
+    public partial class RedisqlCore
     {
         // add row to table and get auto incremented _id value
         public async Task<Int64> TableInsertRowAsync(string tableName, Dictionary<string, string> insertRowColumnNameValuePairs)
@@ -88,11 +88,11 @@ namespace Redisql
                                         break;
 
                                     case "System.DateTime":
-                                        if (cs.defaultValue.Equals("now"))
+                                        if (cs.defaultValue.ToString().ToLower().Equals("now"))
                                         {
                                             heArray[arrayIndex++] = new HashEntry(cs.indexNumber, DateTime.Now.ToString());
                                         }
-                                        else if (cs.defaultValue.Equals("utcnow"))
+                                        else if (cs.defaultValue.ToString().ToLower().Equals("utcnow"))
                                         {
                                             heArray[arrayIndex++] = new HashEntry(cs.indexNumber, DateTime.UtcNow.ToString());
                                         }
@@ -164,7 +164,6 @@ namespace Redisql
                 
                 if (!updateColumnNameValuePairs.TryGetValue(ts.primaryKeyColumnName, out primaryKeyValue))
                     return false; // primary key column not found
-
 
                 var updatedColumns = new Dictionary<string, Tuple<Int32, string>>(); // Column name, Tuple<columnIndex, updatedValue>
 
@@ -254,7 +253,7 @@ namespace Redisql
             finally
             {
                 if (enterTableLock)
-                    TableLockExit(tableName, primaryKeyValue);
+                    await TableLockExit(tableName, primaryKeyValue);
             }
         }
 
@@ -319,11 +318,9 @@ namespace Redisql
             finally
             {
                 if (enterTableLock)
-                    TableLockExit(tableName, primaryKeyValue);
+                    await TableLockExit(tableName, primaryKeyValue);
             }
         }
-
-        
 
         // select one row that matches with primary key column value. 
         // If selectColumnNames is null, select all columns in selected row, or select specified columns only.
