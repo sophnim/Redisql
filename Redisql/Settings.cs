@@ -6,6 +6,26 @@ using System.Threading.Tasks;
 
 namespace Redisql
 {
+    // List<Tuple<string,Type,bool,bool,object>> column list : columnName, columnType, make matchIndex, make rangeIndex, defaultValue
+    //public async Task<bool> TableCreateAsync(string tableName, string primaryKeyColumnName, List<Tuple<string, Type, bool, bool, object>> columnInfoList)
+    public class ColumnConfig
+    {
+        internal string name;
+        internal Type type;
+        internal Object defaultValue;
+        internal bool makeMatchIndex;
+        internal bool makeRankgeIndex;
+
+        public ColumnConfig(string name, Type type, Object defaultValue, bool makeMatchIndex = false, bool makeRangeIndex = false)
+        {
+            this.name = name;
+            this.type = type;
+            this.makeMatchIndex = makeMatchIndex;
+            this.makeRankgeIndex = makeRangeIndex;
+            this.defaultValue = defaultValue;
+        }
+    }
+
     public class ColumnSetting
     {
         internal Int32 indexNumber;
@@ -17,6 +37,7 @@ namespace Redisql
 
     public class TableSetting
     {
+        public string tableName { get; internal set; }
         public int tableID { get; internal set; }
         public string primaryKeyColumnName { get; internal set; }
         public Dictionary<string, ColumnSetting> tableSchemaDic { get; internal set; } = new Dictionary<string, ColumnSetting>();

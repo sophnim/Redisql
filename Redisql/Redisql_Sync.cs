@@ -12,9 +12,9 @@ namespace Redisql
 {
     public partial class Redisql
     {
-        public bool TableCreate(string tableName, string primaryKeyColumnName, List<Tuple<string, Type, bool, bool, object>> columnInfoList)
+        public bool TableCreate(string tableName, string primaryKeyColumnName, List<ColumnConfig> columnConfigList)
         {
-            return WaitTaskAndReturnTaskResult<bool>(TableCreateAsync(tableName, primaryKeyColumnName, columnInfoList));
+            return WaitTaskAndReturnTaskResult<bool>(TableCreateAsync(tableName, primaryKeyColumnName, columnConfigList));
         }
 
         public bool TableDelete(string tableName)
@@ -85,31 +85,15 @@ namespace Redisql
         // select all rows in table
         public IEnumerable<Dictionary<string, string>> TableSelectRowAll(List<string> selectColumnNames, string tableName)
         {
-
             var ts = WaitTaskAndReturnTaskResult<TableSetting>(TableGetSettingAsync(tableName));
-
             var key = RedisKey.GetRedisKey_TablePrimaryKeyList(tableName);
             var db = this.redis.GetDatabase();
 
-            RedisValue[] rv = null;
+            RedisValue[] rva = null;
             if (null != selectColumnNames)
             {
                 // read specified column values
-                var len = selectColumnNames.Count;
-                rv = new RedisValue[len];
-                for (var i = 0; i < len; i++)
-                {
-                    ColumnSetting cs;
-                    if (ts.tableSchemaDic.TryGetValue(selectColumnNames[i], out cs))
-                    {
-                        rv[i] = cs.indexNumber.ToString();
-                    }
-                    else
-                    {
-                        // not existing column name
-                        throw new Exception(string.Format("Table '{0}' does not have '{1}' column", tableName, selectColumnNames[i]));
-                    }
-                }
+                rva = GetSelectColumnIndexNumbers(ts, selectColumnNames);
             }
 
             foreach (var primaryKeyValue in db.SetScan(key, "*"))
@@ -132,7 +116,7 @@ namespace Redisql
                 }
                 else
                 {
-                    var rowdata = db.HashGet(key, rv);
+                    var rowdata = db.HashGet(key, rva);
                     var len = rowdata.Length;
                     if (null != rowdata)
                     {

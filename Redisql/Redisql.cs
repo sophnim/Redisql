@@ -118,10 +118,31 @@ namespace Redisql
             return true;
         }
 
-        private T WaitTaskAndReturnTaskResult<T>(Task<T> task)
+        public T WaitTaskAndReturnTaskResult<T>(Task<T> task)
         {
             task.Wait();
             return task.Result;
+        }
+
+        private RedisValue[] GetSelectColumnIndexNumbers(TableSetting ts, List<string> selectColumnNames)
+        {
+            ColumnSetting cs;
+            var len = selectColumnNames.Count;
+            var rva = new RedisValue[len];
+            for (var i = 0; i < len; i++)
+            {
+                if (ts.tableSchemaDic.TryGetValue(selectColumnNames[i], out cs))
+                {
+                    rva[i] = cs.indexNumber.ToString();
+                }
+                else
+                {
+                    // not existing column
+                    throw new Exception(string.Format("Table '{0}' does not have '{1}' column", ts.tableName, selectColumnNames[i]));
+                }
+            }
+
+            return rva;
         }
 
         public async Task<TableSetting> TableGetSettingAsync(string tableName)
@@ -133,6 +154,7 @@ namespace Redisql
             {
                 // 아직 로드되지 않았다. redis로부터 읽어들인다.
                 ts = new TableSetting();
+                ts.tableName = tableName;
 
                 // get table id
                 var tableID = await db.HashGetAsync(Consts.RedisKey_Hash_TableNameIds, tableName);

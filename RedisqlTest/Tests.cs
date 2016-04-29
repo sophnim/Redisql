@@ -19,16 +19,16 @@ namespace RedisqlTest
             task0.Wait();
             var ts = task0.Result;
 
-            List<Tuple<string, Type, bool, bool, object>> fieldList = new List<Tuple<string, Type, bool, bool, object>>()
+            var columnConfigList = new List<ColumnConfig>()
             {
-                new Tuple<string, Type, bool, bool, object>("name", typeof(String), false, false, null), // name, String type, index required, string can not be sorted, Default null means null value not allowed
-                new Tuple<string, Type, bool, bool, object>("level", typeof(Int32), true, true, 1), // level, Int32 type, index required, sort required, Default 1
-                new Tuple<string, Type, bool, bool, object>("exp", typeof(Int32), false, true, 0), // exp, Int32 type, index not required, sort required, Default 0
-                new Tuple<string, Type, bool, bool, object>("money", typeof(Int32), false, true, 1000), // money, Int32 type, index not required, sort required, Default 1000
-                new Tuple<string, Type, bool, bool, object>("time", typeof(DateTime), false, true, "now"), // time, DateTime type, index not required, sort required, Default now
+                new ColumnConfig("name", typeof(String), null), 
+                new ColumnConfig("level", typeof(Int32), 1), 
+                new ColumnConfig("exp", typeof(Int32), 0), 
+                new ColumnConfig("money", typeof(Int32), 1000), 
+                new ColumnConfig("time", typeof(DateTime), "now") 
             };
             // Create Table
-            redisql.TableCreateAsync("Account_Table", "name", fieldList).Wait(); // primary key field is '_id'. _id is auto generated field that auto incremented when insert.
+            redisql.TableCreateAsync("Account_Table", "name", columnConfigList).Wait(); 
 
             var valueDic = new Dictionary<string, string>()
             {
@@ -184,15 +184,15 @@ namespace RedisqlTest
         {
             Redisql.Redisql redisql = new Redisql.Redisql("127.0.0.1", 6379, "");
 
-            List<Tuple<string, Type, bool, bool, object>> fieldList = new List<Tuple<string, Type, bool, bool, object>>()
+            var columnConfigList = new List<ColumnConfig>()
             {
-                new Tuple<string, Type, bool, bool, object>("name", typeof(String), false, false, null), // name is primaryKey field : String type, primarykey no need to index, can not be sorted
-                new Tuple<string, Type, bool, bool, object>("level", typeof(Int32), true, true, 1), // level, Int32 type, index required, sort required
-                new Tuple<string, Type, bool, bool, object>("exp", typeof(Int32), false, false, 0), // exp, Int32 type, index not required, sort required
-                new Tuple<string, Type, bool, bool, object>("profile", typeof(String), false, false, "") // exp, Int32 type, index not required, sort required
+                new ColumnConfig("name", typeof(String), null), 
+                new ColumnConfig("level", typeof(Int32), 1), 
+                new ColumnConfig("exp", typeof(Int32), 0), 
+                new ColumnConfig("profile", typeof(String), "") 
             };
             // Create Table
-            redisql.TableCreateAsync("Account_Table", "name", fieldList).Wait();
+            redisql.TableCreateAsync("Account_Table", "name", columnConfigList).Wait();
 
             List<Task> tasklist = new List<Task>();
             var stw = Stopwatch.StartNew();
@@ -287,7 +287,7 @@ namespace RedisqlTest
             stw.Restart();
 
             Console.WriteLine("Re-Create Table");
-            redisql.TableCreateAsync("Account_Table", "_id", fieldList).Wait();
+            redisql.TableCreateAsync("Account_Table", "_id", columnConfigList).Wait();
 
             var newRowDic = new Dictionary<string, string>() {
                     { "name", "mike" },
@@ -328,24 +328,57 @@ namespace RedisqlTest
             task0.Wait();
             var ts = task0.Result;
 
-            List<Tuple<string, Type, bool, bool, object>> fieldList = new List<Tuple<string, Type, bool, bool, object>>()
+            var columnConfigList = new List<ColumnConfig>()
             {
-                new Tuple<string, Type, bool, bool, object>("name", typeof(String), true, false, null), // name, String type, index required, string can not be sorted, Default null means null value not allowed
-                new Tuple<string, Type, bool, bool, object>("level", typeof(Int32), true, true, 1), // level, Int32 type, index required, sort required, Default 1
-                new Tuple<string, Type, bool, bool, object>("exp", typeof(Int32), false, true, 0), // exp, Int32 type, index not required, sort required, Default 0
-                new Tuple<string, Type, bool, bool, object>("money", typeof(Int32), false, true, 1000), // money, Int32 type, index not required, sort required, Default 1000
-                new Tuple<string, Type, bool, bool, object>("time", typeof(DateTime), false, true, "now"), // time, DateTime type, index not required, sort required, Default now
+                new ColumnConfig("name", typeof(String), null), 
+                new ColumnConfig("level", typeof(Int32), 1), 
+                new ColumnConfig("exp", typeof(Int32), 0), 
+                new ColumnConfig("money", typeof(Int32), 1000), 
+                new ColumnConfig("time", typeof(DateTime), "now"), 
             };
             // Create Table
-            redisql.TableCreateAsync("Account_Table", "_id", fieldList).Wait(); // primary key field is '_id'. _id is auto generated field that auto incremented when insert.
+            redisql.TableCreateAsync("Account_Table", "_id", columnConfigList).Wait(); // primary key field is '_id'. _id is auto generated field that auto incremented when insert.
 
-            var valueDic = new Dictionary<string, string>()
+            var stw = Stopwatch.StartNew();
+
+            Console.WriteLine("Inserting...");
+
+            int count = 100000;
+            List<Task<long>> tasklist = new List<Task<long>>();
+            for (var i = 0; i < count; i++)
             {
-                { "name", "bruce" },
-                { "level", "1" },
-                { "exp", "100" }
-            };
-            var task1 = redisql.TableInsertRowAsync("Account_Table", valueDic);
+                var valueDic = new Dictionary<string, string>()
+                {
+                    { "name", string.Format("test{0}", i) },
+                    { "level", i.ToString() },
+                    { "exp", "0" }
+                };
+                tasklist.Add(redisql.TableInsertRowAsync("Account_Table", valueDic));
+            }
+
+            foreach (var task in tasklist)
+                task.Wait();
+
+            Console.WriteLine("{0}ms {1}per ms", stw.ElapsedMilliseconds, count / stw.ElapsedMilliseconds);
+            stw.Restart();
+
+            Console.WriteLine("Selecting...");
+
+            count = 0;
+            foreach (var row in redisql.TableSelectRowAll(null, "Account_Table"))
+            {
+                count++;
+                /*
+                foreach (var e in row)
+                    Console.Write("{0}:{1} ", e.Key, e.Value);
+
+                Console.WriteLine();
+                */
+            }
+
+            Console.WriteLine("{0}ms", stw.ElapsedMilliseconds);
+
+            Console.WriteLine("Done! {0}", count);
         }
     }
 }

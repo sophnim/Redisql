@@ -12,6 +12,89 @@ namespace Redisql
 {
     public partial class Redisql
     {
+        public async Task<bool> TableCreateAsync(string tableName, string primaryKeyColumnName, List<ColumnConfig> columnConfigList)
+        {
+            bool enterTableLock = false;
+            try
+            {
+                var ccflist = new List<ColumnConfig>(columnConfigList);
+
+                // check input parameters 
+                foreach (var cf in ccflist)
+                {
+                    if (cf.name.Equals("_id"))
+                        return false; // _id column name is reserved.  
+
+                    if (cf.makeRankgeIndex)
+                    {
+                        switch (cf.type.ToString())
+                        {
+                            case "System.Byte":
+                            case "System.Int16":
+                            case "System.UInt16":
+                            case "System.Int32":
+                            case "System.UInt32":
+                            case "System.Single":
+                            case "System.Double":
+                            case "System.DateTime": // these types could be range indexed
+                                break;
+
+                            default: // other types cannot be range indexed
+                                return false;
+                        }
+                    }
+                }
+
+                // every table automatically generate _id column (auto increment)
+                ccflist.Insert(0, new ColumnConfig("_id", typeof(Int64), defaultValue:null)); 
+
+                enterTableLock = await TableLockEnterAsync(tableName, "");
+
+                var db = this.redis.GetDatabase();
+
+                // check table already exists
+                var ret = await db.HashExistsAsync(Consts.RedisKey_Hash_TableNameIds, tableName);
+                if (ret)
+                    return false; // already existing table name
+
+                // get table id
+                var tableID = await db.StringIncrementAsync(Consts.RedisKey_String_TableNameIds);
+
+                // write tableName-id
+                await db.HashSetAsync(Consts.RedisKey_Hash_TableNameIds, tableName, tableID);
+
+                // write table schema
+                var tableSchemaName = RedisKey.GetRedisKey_TableSchema(tableName);
+                int fieldIndex = 0;
+                foreach (var cf in ccflist)
+                {
+                    bool pkFlag = false;
+                    if (cf.defaultValue == null)
+                        cf.defaultValue = "null";
+
+                    if (cf.name.Equals(primaryKeyColumnName))
+                    {
+                        pkFlag = true;
+                        cf.makeMatchIndex = false; // primary key column does not need additional match index
+                    }
+
+                    var value = string.Format("{0},{1},{2},{3},{4},{5}", (fieldIndex++).ToString(), cf.type.ToString(), cf.makeMatchIndex.ToString(), pkFlag.ToString(), cf.makeRankgeIndex.ToString(), cf.defaultValue.ToString()); // fieldIndex, Type, matchIndexFlag, primaryKeyFlag, rangeIndexFlag, defaultValue
+                    await db.HashSetAsync(tableSchemaName, cf.name, value);
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                return false;
+            }
+            finally
+            {
+                if (enterTableLock)
+                    TableLockExit(tableName, "");
+            }
+        }
+
         public async Task<bool> TableDeleteAsync(string tableName)
         {
             bool enterTableLock = false;
@@ -48,8 +131,8 @@ namespace Redisql
                 {
                     await t;
                 }
-                
-                // 메모리상의 테이블 세팅 삭제
+
+                // remove table setting info
                 this.tableSettingDic.TryRemove(tableName, out ts);
 
                 return true;
@@ -57,93 +140,6 @@ namespace Redisql
             catch (Exception ex)
             {
 
-                return false;
-            }
-            finally
-            {
-                if (enterTableLock)
-                    TableLockExit(tableName, "");
-            }
-        }
-
-        // List<Tuple<string,Type,bool,bool,object>> column list : columnName, columnType, make matchIndex, make rangeIndex, defaultValue
-        public async Task<bool> TableCreateAsync(string tableName, string primaryKeyColumnName, List<Tuple<string, Type, bool, bool, object>> columnInfoList)
-        {
-            bool enterTableLock = false;
-            try
-            {
-                var ciflist = new List<Tuple<string, Type, bool, bool, object>>(columnInfoList);
-
-                // check input parameters 
-                foreach (var tpl in ciflist)
-                {
-                    if (tpl.Item1.Equals("_id"))
-                        return false; // _id column name is reserved.  
-
-                    if (tpl.Item4)
-                    {
-                        switch (tpl.Item2.ToString())
-                        {
-                            case "System.Byte":
-                            case "System.Int16":
-                            case "System.UInt16":
-                            case "System.Int32":
-                            case "System.UInt32":
-                            case "System.Single":
-                            case "System.Double":
-                            case "System.DateTime": // these types could be range indexed
-                                break;
-
-                            default: // other types cannot be range indexed
-                                return false;
-                        }
-                    }
-                }
-
-                // every table automatically generate _id column (auto increment)
-                ciflist.Insert(0, new Tuple<string, Type, bool, bool, object>("_id", typeof(Int64), false, false, null));
-
-                enterTableLock = await TableLockEnterAsync(tableName, "");
-
-                var db = this.redis.GetDatabase();
-
-                // check table already exists
-                var ret = await db.HashExistsAsync(Consts.RedisKey_Hash_TableNameIds, tableName);
-                if (ret)
-                    return false; // already existing table name
-
-                // get table id
-                var tableID = await db.StringIncrementAsync(Consts.RedisKey_String_TableNameIds);
-
-                // write tableName-id
-                await db.HashSetAsync(Consts.RedisKey_Hash_TableNameIds, tableName, tableID);
-
-                // write table schema
-                var tableSchemaName = RedisKey.GetRedisKey_TableSchema(tableName);
-                int fieldIndex = 0;
-                foreach (var t in ciflist)
-                {
-                    bool pkFlag = false;
-                    bool matchIndexFlag = t.Item3;
-                    bool rangeIndexFlag = t.Item4;
-                    object defaultValue = t.Item5;
-                    if (defaultValue == null)
-                        defaultValue = "null";
-
-                    if (t.Item1.Equals(primaryKeyColumnName))
-                    {
-                        pkFlag = true;
-                        matchIndexFlag = false;
-                    }
-
-                    var value = string.Format("{0},{1},{2},{3},{4},{5}", (fieldIndex++).ToString(), t.Item2.ToString(), matchIndexFlag.ToString(), pkFlag.ToString(), rangeIndexFlag.ToString(), defaultValue.ToString()); // fieldIndex, Type, matchIndexFlag, primaryKeyFlag, rangeIndexFlag
-                    await db.HashSetAsync(tableSchemaName, t.Item1, value);
-                }
-
-                return true;
-            }
-            catch (Exception ex)
-            {
                 return false;
             }
             finally

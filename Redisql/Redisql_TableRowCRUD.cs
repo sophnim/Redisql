@@ -357,25 +357,12 @@ namespace Redisql
                 else
                 {
                     // read specified column values
-                    var len = selectColumnNames.Count;
-                    RedisValue[] rv = new RedisValue[len];
-                    for (var i = 0; i < len; i++)
-                    {
-                        ColumnSetting cs;
-                        if (ts.tableSchemaDic.TryGetValue(selectColumnNames[i], out cs))
-                        {
-                            rv[i] = cs.indexNumber.ToString();
-                        }
-                        else
-                        {
-                            // not existing column name
-                            throw new Exception(string.Format("Table '{0}' does not have '{1}' column", tableName, selectColumnNames[i]));
-                        }
-                    }
-                    var ret = await db.HashGetAsync(key, rv);
+                    var rva = GetSelectColumnIndexNumbers(ts, selectColumnNames);
+                    
+                    var ret = await db.HashGetAsync(key, rva);
                     if (null != ret)
                     {
-                        for (var i = 0; i < len; i++)
+                        for (var i = 0; i < rva.Length; i++)
                         {
                             retdic.Add(selectColumnNames[i], ret[i].ToString());
                         }
@@ -439,21 +426,8 @@ namespace Redisql
                 else
                 {
                     // read specified columns
-                    var len = selectColumnNames.Count;
-                    var rva = new RedisValue[len];
-                    for (var i = 0; i < len; i++)
-                    {
-                        if (ts.tableSchemaDic.TryGetValue(selectColumnNames[i], out cs))
-                        {
-                            rva[i] = cs.indexNumber.ToString();
-                        }
-                        else
-                        {
-                            // not existing column
-                            throw new Exception(string.Format("Table '{0}' does not have '{1}' column", tableName, selectColumnNames[i]));
-                        }
-                    }
-
+                    var rva = GetSelectColumnIndexNumbers(ts, selectColumnNames);
+                    
                     var tasklist = new List<Task<RedisValue[]>>();
                     foreach (var pk in pkvs)
                     {
@@ -467,7 +441,7 @@ namespace Redisql
                         rva = task.Result;
                         var dic = new Dictionary<string, string>();
 
-                        for (var i = 0; i < len; i++)
+                        for (var i = 0; i < rva.Length; i++)
                         {
                             dic.Add(selectColumnNames[i], rva[i].ToString());
                         }
@@ -533,20 +507,7 @@ namespace Redisql
                 else
                 {
                     // read specified columns
-                    var len = selectColumnNames.Count;
-                    var rva = new RedisValue[len];
-                    for (var i = 0; i < len; i++)
-                    {
-                        if (ts.tableSchemaDic.TryGetValue(selectColumnNames[i], out cs))
-                        {
-                            rva[i] = cs.indexNumber.ToString();
-                        }
-                        else
-                        {
-                            // not existing column
-                            throw new Exception(string.Format("Table '{0}' does not have '{1}' column", tableName, selectColumnNames[i]));
-                        }
-                    }
+                    var rva = GetSelectColumnIndexNumbers(ts, selectColumnNames);
 
                     var tasklist = new List<Task<RedisValue[]>>();
                     foreach (var primaryKeyValue in primaryKeyValues)
@@ -561,7 +522,7 @@ namespace Redisql
                         rva = task.Result;
                         var dic = new Dictionary<string, string>();
 
-                        for (var i = 0; i < len; i++)
+                        for (var i = 0; i < rva.Length; i++)
                         {
                             dic.Add(selectColumnNames[i], rva[i].ToString());
                         }
