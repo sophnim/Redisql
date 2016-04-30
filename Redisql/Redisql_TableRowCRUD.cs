@@ -184,7 +184,7 @@ namespace Redisql.Core
                     }
                 }
 
-                enterTableLock = await TableLockEnterAsync(tableName, primaryKeyValue);
+                enterTableLock = await TableLockEnterAsync(ts, primaryKeyValue);
 
                 // get values from stored in update columns
                 if (updatedColumns.Count > 0)
@@ -262,14 +262,14 @@ namespace Redisql.Core
             bool enterTableLock = false;
             try
             {
-                enterTableLock = await TableLockEnterAsync(tableName, primaryKeyValue);
-
                 var db = this.redis.GetDatabase();
                 List<Task> tasklist = new List<Task>();
 
                 var ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
                     return false;
+
+                enterTableLock = await TableLockEnterAsync(ts, primaryKeyValue);
 
                 // before delete, read all row to delete index
                 var key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue);

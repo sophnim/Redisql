@@ -35,7 +35,7 @@ namespace Redisql.Core
                 if (ts.primaryKeyColumnName.Equals(columnName))
                     pkFlag = true;
                 
-                enterTableLock = await TableLockEnterAsync(tableName, "");
+                enterTableLock = await TableLockEnterAsync(ts, "");
 
                 cs.isRangeIndex = true;
                 ts.rangeIndexColumnDic.Add(columnName, cs.indexNumber);
@@ -101,7 +101,7 @@ namespace Redisql.Core
                 if (ts.primaryKeyColumnName.Equals(columnName))
                     pkFlag = true;
                 
-                enterTableLock = await TableLockEnterAsync(tableName, "");
+                enterTableLock = await TableLockEnterAsync(ts, "");
 
                 cs.isRangeIndex = false;
                 ts.rangeIndexColumnDic.Remove(columnName);

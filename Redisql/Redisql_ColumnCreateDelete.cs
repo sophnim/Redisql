@@ -29,7 +29,7 @@ namespace Redisql.Core
                 if (null == ts)
                     return false;
                 
-                enterTableLock = await TableLockEnterAsync(tableName, "");
+                enterTableLock = await TableLockEnterAsync(ts, "");
 
                 var cs = new ColumnSetting();
                 cs.indexNumber = ts.GetNextColumnIndexNumber();
@@ -123,7 +123,7 @@ namespace Redisql.Core
                 if (ts.primaryKeyColumnName.Equals(columnName))
                     return false; // Can not delete PrimaryKey column
                 
-                enterTableLock = await TableLockEnterAsync(tableName, "");
+                enterTableLock = await TableLockEnterAsync(ts, "");
 
                 ColumnSetting cs;
                 if (!ts.tableSchemaDic.TryGetValue(ts.primaryKeyColumnName, out cs))

@@ -46,9 +46,11 @@ namespace Redisql.Core
                 }
 
                 // every table automatically generate _id column (auto increment)
-                ccflist.Insert(0, new ColumnConfig("_id", typeof(Int64), defaultValue:null)); 
+                ccflist.Insert(0, new ColumnConfig("_id", typeof(Int64), defaultValue:null));
 
-                enterTableLock = await TableLockEnterAsync(tableName, "");
+                var ts = new TableSetting();
+                ts.tableName = tableName;
+                enterTableLock = await TableLockEnterAsync(ts, "");
 
                 var db = this.redis.GetDatabase();
 
@@ -100,13 +102,13 @@ namespace Redisql.Core
             bool enterTableLock = false;
             try
             {
-                enterTableLock = await TableLockEnterAsync(tableName, "");
-
                 var db = this.redis.GetDatabase();
 
                 var ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
                     return false;
+
+                enterTableLock = await TableLockEnterAsync(ts, "");
 
                 var key = RedisKey.GetRedisKey_TablePrimaryKeyList(tableName);
 

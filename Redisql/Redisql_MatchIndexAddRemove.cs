@@ -35,7 +35,7 @@ namespace Redisql.Core
                 if (cs.isMatchIndex)
                     return false; // Already indexed column. No need to add index.
                 
-                enterTableLock = await TableLockEnterAsync(tableName, "");
+                enterTableLock = await TableLockEnterAsync(ts, "");
 
                 cs.isMatchIndex = true;
                 ts.matchIndexColumnDic.Add(columnName, cs.indexNumber);
@@ -99,7 +99,7 @@ namespace Redisql.Core
                 if (!cs.isMatchIndex)
                     return false; // Not indexed column. Could not remove index.
                 
-                enterTableLock = await TableLockEnterAsync(tableName, "");
+                enterTableLock = await TableLockEnterAsync(ts, "");
 
                 cs.isMatchIndex = false;
                 ts.matchIndexColumnDic.Remove(columnName);

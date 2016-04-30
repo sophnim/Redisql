@@ -16,7 +16,7 @@ namespace RedisqlTest
 
         public Tests()
         {
-            this.redisql = new RedisqlCore("127.0.0.1", 6379, "");
+            this.redisql = new RedisqlCore("192.168.25.4", 6379, "");
         }
 
         public async void AsyncTest()
@@ -62,19 +62,20 @@ namespace RedisqlTest
             };
             await this.redisql.TableInsertRowAsync("Account_Table", valueDic);
             
-            // insert another row
+            // update row
             valueDic = new Dictionary<string, string>()
             {
                 { "name", "bruce" },
                 { "exp", "250" }
             };
+
             await this.redisql.TableUpdateRowAsync("Account_Table", valueDic);
 
-            // insert another row
+            // update row
             valueDic = new Dictionary<string, string>()
             {
                 { "name", "jane" },
-                { "level", "2" }
+                { "level", "3" }
             };
             await this.redisql.TableUpdateRowAsync("Account_Table", valueDic);
 
