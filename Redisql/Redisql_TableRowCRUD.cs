@@ -150,6 +150,7 @@ namespace Redisql.Core
         public async Task<bool> TableUpdateRowAsync(string tableName, Dictionary<string, string> updateColumnNameValuePairs)
         {
             string key;
+            TableSetting ts = null;
             bool enterTableLock = false;
             string primaryKeyValue = null;
 
@@ -158,7 +159,7 @@ namespace Redisql.Core
                 var db = this.redis.GetDatabase();
                 List<Task> tasklist = new List<Task>();
 
-                var ts = await TableGetSettingAsync(tableName);
+                ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
                     return false;
                 
@@ -253,19 +254,20 @@ namespace Redisql.Core
             finally
             {
                 if (enterTableLock)
-                    await TableLockExit(tableName, primaryKeyValue);
+                    TableLockExit(ts, primaryKeyValue);
             }
         }
 
         public async Task<bool> TableDeleteRowAsync(string tableName, string primaryKeyValue)
         {
+            TableSetting ts = null;
             bool enterTableLock = false;
             try
             {
                 var db = this.redis.GetDatabase();
                 List<Task> tasklist = new List<Task>();
 
-                var ts = await TableGetSettingAsync(tableName);
+                ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
                     return false;
 
@@ -318,7 +320,7 @@ namespace Redisql.Core
             finally
             {
                 if (enterTableLock)
-                    await TableLockExit(tableName, primaryKeyValue);
+                    TableLockExit(ts, primaryKeyValue);
             }
         }
 

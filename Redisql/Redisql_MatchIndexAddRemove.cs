@@ -16,12 +16,13 @@ namespace Redisql.Core
         // Add match index to unindexed existing table field
         public async Task<bool> TableAddMatchIndexAsync(string tableName, string columnName)
         {
+            TableSetting ts = null;
             bool enterTableLock = false;
             try
             {
                 var db = this.redis.GetDatabase();
 
-                var ts = await TableGetSettingAsync(tableName);
+                ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
                     return false;
                 
@@ -73,19 +74,20 @@ namespace Redisql.Core
             finally
             {
                 if (enterTableLock)
-                    await TableLockExit(tableName, "");
+                    TableLockExit(ts, "");
             }
         }
 
         // Remove match index to indexed existing table field
         public async Task<bool> TableRemoveMatchIndexAsync(string tableName, string columnName)
         {
+            TableSetting ts = null;
             bool enterTableLock = false;
             try
             {
                 var db = this.redis.GetDatabase();
 
-                var ts = await TableGetSettingAsync(tableName);
+                ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
                     return false;
                 
@@ -137,7 +139,7 @@ namespace Redisql.Core
             finally
             {
                 if (enterTableLock)
-                    await TableLockExit(tableName, "");
+                    TableLockExit(ts, "");
             }
         }
     }

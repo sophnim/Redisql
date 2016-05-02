@@ -7,6 +7,7 @@ using System.Diagnostics;
 
 using Redisql.Core;
 using Redisql.Helper;
+using Redisql.Transaction;
 
 namespace RedisqlTest
 {
@@ -16,7 +17,7 @@ namespace RedisqlTest
 
         public Tests()
         {
-            this.redisql = new RedisqlCore("192.168.25.4", 6379, "");
+            this.redisql = new RedisqlCore("192.168.25.7", 6379, "");
         }
 
         public async void AsyncTest()
@@ -61,7 +62,7 @@ namespace RedisqlTest
                 { "exp", "300" }
             };
             await this.redisql.TableInsertRowAsync("Account_Table", valueDic);
-            
+
             // update row
             valueDic = new Dictionary<string, string>()
             {
@@ -71,13 +72,36 @@ namespace RedisqlTest
 
             await this.redisql.TableUpdateRowAsync("Account_Table", valueDic);
 
-            // update row
-            valueDic = new Dictionary<string, string>()
+            // update row : using transaction
+            using (var tran = new RedisqlTransaction(this.redisql, new List<TransactionTarget>()
             {
-                { "name", "jane" },
-                { "level", "3" }
-            };
-            await this.redisql.TableUpdateRowAsync("Account_Table", valueDic);
+                new TransactionTarget { tableName = "Account_Table", primaryKeyValue = "bruce" },
+                new TransactionTarget { tableName = "Account_Table", primaryKeyValue = "jane" }
+            }))
+            {
+                if (await tran.TryBeginTransactionAsync()) // Try to Begin transaction
+                {
+                    // success to begin transaction
+
+                    valueDic = new Dictionary<string, string>()
+                    {
+                        { "name", "bruce" },
+                        { "exp", "270" }
+                    };
+                    await this.redisql.TableUpdateRowAsync("Account_Table", valueDic);
+
+                    valueDic = new Dictionary<string, string>()
+                    {
+                        { "name", "jane" },
+                        { "level", "3" }
+                    };
+                    await this.redisql.TableUpdateRowAsync("Account_Table", valueDic);
+                }
+                else
+                {
+                    // failed to start transaction
+                }
+            }
 
             // select a row that have a primary key value "bruce"
             Console.WriteLine("select * from Account_Table where name = bruce");

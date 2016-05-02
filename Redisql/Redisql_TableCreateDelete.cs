@@ -14,6 +14,7 @@ namespace Redisql.Core
     {
         public async Task<bool> TableCreateAsync(string tableName, List<ColumnConfig> columnConfigList, string primaryKeyColumnName)
         {
+            TableSetting ts = null;
             bool enterTableLock = false;
             try
             {
@@ -48,7 +49,7 @@ namespace Redisql.Core
                 // every table automatically generate _id column (auto increment)
                 ccflist.Insert(0, new ColumnConfig("_id", typeof(Int64), defaultValue:null));
 
-                var ts = new TableSetting();
+                ts = new TableSetting();
                 ts.tableName = tableName;
                 enterTableLock = await TableLockEnterAsync(ts, "");
 
@@ -93,18 +94,19 @@ namespace Redisql.Core
             finally
             {
                 if (enterTableLock)
-                    await TableLockExit(tableName, "");
+                    TableLockExit(ts, "");
             }
         }
 
         public async Task<bool> TableDeleteAsync(string tableName)
         {
+            TableSetting ts = null;
             bool enterTableLock = false;
             try
             {
                 var db = this.redis.GetDatabase();
 
-                var ts = await TableGetSettingAsync(tableName);
+                ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
                     return false;
 
@@ -147,7 +149,7 @@ namespace Redisql.Core
             finally
             {
                 if (enterTableLock)
-                    await TableLockExit(tableName, "");
+                    TableLockExit(ts, "");
             }
         }
     }

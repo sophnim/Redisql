@@ -14,6 +14,7 @@ namespace Redisql.Core
     {
         public async Task<bool> TableCreateNewColumnAsync(string tableName, string columnName, Type columnType, bool makeMatchIndex, bool makeRangeIndex, object defaultValue)
         {
+            TableSetting ts = null;
             bool enterTableLock = false;
             try
             {
@@ -25,7 +26,7 @@ namespace Redisql.Core
 
                 var db = this.redis.GetDatabase();
 
-                var ts = await TableGetSettingAsync(tableName);
+                ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
                     return false;
                 
@@ -105,18 +106,19 @@ namespace Redisql.Core
             finally
             {
                 if (enterTableLock)
-                    await TableLockExit(tableName, "");
+                    TableLockExit(ts, "");
             }
         }
 
         public async Task<bool> TableDeleteExistingColumnAsync(string tableName, string columnName)
         {
+            TableSetting ts = null;
             bool enterTableLock = false;
             try
             {
                 var db = this.redis.GetDatabase();
 
-                var ts = await TableGetSettingAsync(tableName);
+                ts = await TableGetSettingAsync(tableName);
                 if (null == ts)
                     return false;
                 
@@ -196,7 +198,7 @@ namespace Redisql.Core
             finally
             {
                 if (enterTableLock)
-                    await TableLockExit(tableName, "");
+                    TableLockExit(ts, "");
             }
         }
     }

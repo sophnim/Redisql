@@ -73,19 +73,17 @@ namespace Redisql.Core
             }
         }
 
-        public async Task<bool> TableLockExit(string tableName, string primaryKeyValue)
+        public async void TableLockExit(TableSetting tableSetting, string primaryKeyValue)
         {
             try
             {
                 var db = this.redis.GetDatabase();
-                var key = RedisKey.GetRedisKey_TableLock(tableName, primaryKeyValue);
+                var key = RedisKey.GetRedisKey_TableLock(tableSetting.tableName, primaryKeyValue);
                 await db.KeyDeleteAsync(key);
-
-                return true;
             }
             catch
             {
-                return false;
+                
             }
         }
     }
