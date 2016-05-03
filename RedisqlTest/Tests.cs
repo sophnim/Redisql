@@ -86,11 +86,11 @@ namespace RedisqlTest
 
                 var exp1 = Convert.ToInt32(dic1["exp"]);
                 dic1["exp"] = (exp1 + 10).ToString();
-                await tran.TableUpdateRowAsync("Account_Name", dic1);
+                await tran.TableUpdateRowAsync("Account_Table", dic1);
 
                 var exp2 = Convert.ToInt32(dic1["exp"]);
                 dic2["exp"] = (exp2 + 10).ToString();
-                await tran.TableUpdateRowAsync("Account_Name", dic2);
+                await tran.TableUpdateRowAsync("Account_Table", dic2);
 
                 tran.EndTransaction();
             }
