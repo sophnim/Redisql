@@ -60,7 +60,7 @@ namespace Redisql.Core
                     if (stw.ElapsedMilliseconds > 3000)
                     {
                         // maybe deadlock?
-                        Console.WriteLine("TableLockEnterAsync takes too long time: Deadlock is suspected!");
+                        Console.WriteLine("TableLockEnterAsync takes too long time: Deadlock or Transaction error is suspected!");
                         stw.Restart();
                     }
                 } while (false == ret);

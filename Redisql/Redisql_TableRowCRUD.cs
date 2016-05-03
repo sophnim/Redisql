@@ -147,7 +147,7 @@ namespace Redisql.Core
             }
         }
 
-        public async Task<bool> TableUpdateRowAsync(string tableName, Dictionary<string, string> updateColumnNameValuePairs)
+        public async Task<bool> TableUpdateRowAsync(string tableName, Dictionary<string, string> updateColumnNameValuePairs, bool useTableLock = true)
         {
             string key;
             TableSetting ts = null;
@@ -185,7 +185,10 @@ namespace Redisql.Core
                     }
                 }
 
-                enterTableLock = await TableLockEnterAsync(ts, primaryKeyValue);
+                if (useTableLock)
+                {
+                    enterTableLock = await TableLockEnterAsync(ts, primaryKeyValue);
+                }
 
                 // get values from stored in update columns
                 if (updatedColumns.Count > 0)
@@ -258,7 +261,7 @@ namespace Redisql.Core
             }
         }
 
-        public async Task<bool> TableDeleteRowAsync(string tableName, string primaryKeyValue)
+        public async Task<bool> TableDeleteRowAsync(string tableName, string primaryKeyValue, bool useTableLock = true)
         {
             TableSetting ts = null;
             bool enterTableLock = false;
@@ -271,7 +274,10 @@ namespace Redisql.Core
                 if (null == ts)
                     return false;
 
-                enterTableLock = await TableLockEnterAsync(ts, primaryKeyValue);
+                if (useTableLock)
+                {
+                    enterTableLock = await TableLockEnterAsync(ts, primaryKeyValue);
+                }
 
                 // before delete, read all row to delete index
                 var key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyValue);
@@ -326,7 +332,7 @@ namespace Redisql.Core
 
         // select one row that matches with primary key column value. 
         // If selectColumnNames is null, select all columns in selected row, or select specified columns only.
-        public async Task<Dictionary<string, string>> TableSelectRowByPrimaryKeyColumnValueAsync(List<string> selectColumnNames, string tableName, string primaryKeyColumnValue)
+        public async Task<Dictionary<string, string>> TableSelectRowAsync(List<string> selectColumnNames, string tableName, string primaryKeyColumnValue)
         {
             try
             {
@@ -377,7 +383,7 @@ namespace Redisql.Core
         }
 
         // select all rows that matches match index column value
-        public async Task<List<Dictionary<string, string>>> TableSelectRowByMatchIndexColumnValueAsync(List<string> selectColumnNames, string tableName, string compareMatchIndexColumnName, string compareColumnValue)
+        public async Task<List<Dictionary<string, string>>> TableSelectRowAsync(List<string> selectColumnNames, string tableName, string compareMatchIndexColumnName, string compareColumnValue)
         {
             try
             {
@@ -457,7 +463,7 @@ namespace Redisql.Core
         }
 
         // select all rows that has range index column values is between lowValue and highValue
-        public async Task<List<Dictionary<string, string>>> TableSelectRowByRangeIndexAsync(List<string> selectColumnNames, string tableName, string compareRangeIndexColumnName, string lowValue, string highValue)
+        public async Task<List<Dictionary<string, string>>> TableSelectRowAsync(List<string> selectColumnNames, string tableName, string compareRangeIndexColumnName, string lowValue, string highValue)
         {
             try
             {

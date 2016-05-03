@@ -17,7 +17,7 @@ namespace RedisqlTest
 
         public Tests()
         {
-            this.redisql = new RedisqlCore("192.168.25.7", 6379, "");
+            this.redisql = new RedisqlCore("127.0.0.1", 6379, "");
         }
 
         public async void AsyncTest()
@@ -69,64 +69,62 @@ namespace RedisqlTest
                 { "name", "bruce" },
                 { "exp", "250" }
             };
-
             await this.redisql.TableUpdateRowAsync("Account_Table", valueDic);
 
+
             // update row : using transaction
-            using (var tran = new RedisqlTransaction(this.redisql, new List<TransactionTarget>()
+            var tran = new Transaction(this.redisql, new List<TransactionTarget>()
             {
-                new TransactionTarget { tableName = "Account_Table", primaryKeyValue = "bruce" },
-                new TransactionTarget { tableName = "Account_Table", primaryKeyValue = "jane" }
-            }))
+                new TransactionTarget("Account_Table", "bruce"),    
+                new TransactionTarget("Account_Table", "jane")
+            });
+
+            if (await tran.TryBeginTransactionAsync())
             {
-                if (await tran.TryBeginTransactionAsync()) // Try to Begin transaction
-                {
-                    // success to begin transaction
+                var dic1 = await tran.TableSelectRowAsync(new List<string> { "name", "exp" }, "Account_Table", "bruce");
+                var dic2 = await tran.TableSelectRowAsync(new List<string> { "name", "exp" }, "Account_Table", "jane");
 
-                    valueDic = new Dictionary<string, string>()
-                    {
-                        { "name", "bruce" },
-                        { "exp", "270" }
-                    };
-                    await this.redisql.TableUpdateRowAsync("Account_Table", valueDic);
+                var exp1 = Convert.ToInt32(dic1["exp"]);
+                dic1["exp"] = (exp1 + 10).ToString();
+                await tran.TableUpdateRowAsync("Account_Name", dic1);
 
-                    valueDic = new Dictionary<string, string>()
-                    {
-                        { "name", "jane" },
-                        { "level", "3" }
-                    };
-                    await this.redisql.TableUpdateRowAsync("Account_Table", valueDic);
-                }
-                else
-                {
-                    // failed to start transaction
-                }
+                var exp2 = Convert.ToInt32(dic1["exp"]);
+                dic2["exp"] = (exp2 + 10).ToString();
+                await tran.TableUpdateRowAsync("Account_Name", dic2);
+
+                tran.EndTransaction();
             }
+            else
+            {
+                // failed to begin transaction
+                Console.WriteLine("Failed to begin transaction");
+            }
+            
 
             // select a row that have a primary key value "bruce"
             Console.WriteLine("select * from Account_Table where name = bruce");
-            var row = await redisql.TableSelectRowByPrimaryKeyColumnValueAsync(null, "Account_Table", "bruce");
+            var row = await redisql.TableSelectRowAsync(null, "Account_Table", "bruce");
             RedisqlHelper.PrintRow(row);
 
             Console.WriteLine("");
 
             // specify column name to select
             Console.WriteLine("select _id, name, level from Account_Table where name = bruce");
-            row = await redisql.TableSelectRowByPrimaryKeyColumnValueAsync(new List<string> { "_id", "name", "level" }, "Account_Table", "bruce");
+            row = await redisql.TableSelectRowAsync(new List<string> { "_id", "name", "level" }, "Account_Table", "bruce");
             RedisqlHelper.PrintRow(row);
 
             Console.WriteLine("");
 
             // select rows that matches value with match index column
             Console.WriteLine("select * from Account_Table where level == 1");
-            var rows = await redisql.TableSelectRowByMatchIndexColumnValueAsync(null, "Account_Table", "level", "1");
+            var rows = await redisql.TableSelectRowAsync(null, "Account_Table", "level", "1");
             RedisqlHelper.PrintRows(rows);
 
             Console.WriteLine("");
 
             // select rows that has a proper range column value
             Console.WriteLine("select * from Account_Table where 250 <= exp <= 300");
-            rows = await redisql.TableSelectRowByRangeIndexAsync(null, "Account_Table", "exp", "250", "300");
+            rows = await redisql.TableSelectRowAsync(null, "Account_Table", "exp", "250", "300");
             RedisqlHelper.PrintRows(rows);
             
             Console.WriteLine("\n\nEnd of Test");

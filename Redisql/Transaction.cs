@@ -1,0 +1,125 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+using Redisql.Core;
+
+namespace Redisql.Transaction
+{
+    public class TransactionTarget
+    {
+        public string tableName;
+        public string primaryKeyValue;
+
+        public TransactionTarget(string tableName, string primaryKeyValue)
+        {
+            this.tableName = tableName;
+            this.primaryKeyValue = primaryKeyValue;
+        }
+    }
+
+    public class Transaction : IDisposable
+    {
+        bool isBegin = false;
+        RedisqlCore redis;
+        List<TransactionTarget> tranTargetList;
+        List<Tuple<TableSetting, string>> enterSuccessList;
+
+        public Transaction(RedisqlCore redis, List<TransactionTarget> tranTargetList)
+        {
+            this.redis = redis;
+            this.tranTargetList = tranTargetList;
+            this.enterSuccessList = new List<Tuple<TableSetting, string>>();
+        }
+
+        ~Transaction()
+        {
+            if (isBegin)
+                TableLockExit();
+        }
+
+        private void TableLockExit()
+        {
+            var len = this.enterSuccessList.Count;
+            for (var i = 0; i < len; i++)
+            {
+                var ts = this.enterSuccessList[i].Item1;
+                var primaryKeyValue = this.enterSuccessList[i].Item2;
+
+                this.redis.TableLockExit(ts, primaryKeyValue);
+            }
+
+            this.enterSuccessList.Clear();
+        }
+
+        public async Task<bool> TryBeginTransactionAsync(int maxRetryCount = 100)
+        {
+            if (isBegin)
+                return false;
+
+            var len = this.tranTargetList.Count;
+            int retryCount = 0;
+            while (true)
+            {
+                for (var i = 0; i < len; i++)
+                {
+                    var tranTarget = this.tranTargetList[i];
+                    var ts = await this.redis.TableGetSettingAsync(tranTarget.tableName);
+
+                    if (!await this.redis.TableLockTryEnterAsync(ts, tranTarget.primaryKeyValue, 10))
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        this.enterSuccessList.Add(new Tuple<TableSetting, string>(ts, tranTarget.primaryKeyValue));
+                    }
+                }
+
+                if (this.enterSuccessList.Count != tranTargetList.Count)
+                {
+                    TableLockExit();
+                    if (++ retryCount >= maxRetryCount)
+                    {
+                        return false;
+                    }
+                    else await Task.Delay(1);
+                }
+                else break;
+            }
+
+            isBegin = true;
+            return true;
+        }
+
+        public void EndTransaction()
+        {
+            TableLockExit();
+            isBegin = false;
+        }
+
+        public void Dispose()
+        {
+            TableLockExit();
+            isBegin = false;
+        }
+
+
+        public async Task<Dictionary<string, string>> TableSelectRowAsync(List<string> selectColumnNames, string tableName, string primaryKeyColumnValue)
+        {
+            return await this.redis.TableSelectRowAsync(selectColumnNames, tableName, primaryKeyColumnValue);
+        }
+
+        public async Task<bool> TableUpdateRowAsync(string tableName, Dictionary<string, string> updateColumnNameValuePairs)
+        {
+            return await this.redis.TableUpdateRowAsync(tableName, updateColumnNameValuePairs, useTableLock:false);
+        }
+
+        public async Task<bool> TableDeleteRowAsync(string tableName, string primaryKeyValue, bool useTableLock = true)
+        {
+            return await this.redis.TableDeleteRowAsync(tableName, primaryKeyValue, useTableLock: false);
+        }
+    }
+}

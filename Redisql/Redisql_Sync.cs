@@ -37,19 +37,19 @@ namespace Redisql.Core
             return WaitTaskAndReturnTaskResult<bool>(TableDeleteRowAsync(tableName, primaryKeyValue));
         }
 
-        public Dictionary<string, string> TableSelectRowByPrimaryKeyColumnValue(List<string> selectColumnNames, string tableName, string primaryKeyColumnValue)
+        public Dictionary<string, string> TableSelectRow(List<string> selectColumnNames, string tableName, string primaryKeyColumnValue)
         {
-            return WaitTaskAndReturnTaskResult<Dictionary<string, string>>(TableSelectRowByPrimaryKeyColumnValueAsync(selectColumnNames, tableName, primaryKeyColumnValue));
+            return WaitTaskAndReturnTaskResult<Dictionary<string, string>>(TableSelectRowAsync(selectColumnNames, tableName, primaryKeyColumnValue));
         }
 
-        public List<Dictionary<string, string>> TableSelectRowByMatchIndexColumnValue(List<string> selectColumnNames, string tableName, string compareMatchIndexColumnName, string compareColumnValue)
+        public List<Dictionary<string, string>> TableSelectRow(List<string> selectColumnNames, string tableName, string compareMatchIndexColumnName, string compareColumnValue)
         {
-            return WaitTaskAndReturnTaskResult<List<Dictionary<string, string>>>(TableSelectRowByMatchIndexColumnValueAsync(selectColumnNames, tableName, compareMatchIndexColumnName, compareColumnValue));
+            return WaitTaskAndReturnTaskResult<List<Dictionary<string, string>>>(TableSelectRowAsync(selectColumnNames, tableName, compareMatchIndexColumnName, compareColumnValue));
         }
 
-        public List<Dictionary<string, string>> TableSelectRowByRangeIndex(List<string> selectColumnNames, string tableName, string compareRangeIndexColumnName, string lowValue, string highValue)
+        public List<Dictionary<string, string>> TableSelectRow(List<string> selectColumnNames, string tableName, string compareRangeIndexColumnName, string lowValue, string highValue)
         {
-            return WaitTaskAndReturnTaskResult<List<Dictionary<string, string>>>(TableSelectRowByRangeIndexAsync(selectColumnNames, tableName, compareRangeIndexColumnName, lowValue, highValue));
+            return WaitTaskAndReturnTaskResult<List<Dictionary<string, string>>>(TableSelectRowAsync(selectColumnNames, tableName, compareRangeIndexColumnName, lowValue, highValue));
         }
 
         public bool TableCreateNewColumn(string tableName, string columnName, Type columnType, bool makeMatchIndex, bool makeRangeIndex, object defaultValue)
