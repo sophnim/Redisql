@@ -106,7 +106,7 @@ namespace Redisql.Core
             finally
             {
                 if (enterTableLock)
-                    TableLockExit(ts, "");
+                    await TableLockExit(ts, "");
             }
         }
 
@@ -198,7 +198,7 @@ namespace Redisql.Core
             finally
             {
                 if (enterTableLock)
-                    TableLockExit(ts, "");
+                    await TableLockExit(ts, "");
             }
         }
     }

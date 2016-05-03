@@ -12,6 +12,11 @@ namespace Redisql.Core
 {
     public partial class RedisqlCore
     {
+        public bool TableLockClearAll()
+        {
+            return WaitTaskAndReturnTaskResult<bool>(TableLockClearAllAsync());
+        }
+
         public bool TableCreate(string tableName, List<ColumnConfig> columnConfigList, string primaryKeyColumnName)
         {
             return WaitTaskAndReturnTaskResult<bool>(TableCreateAsync(tableName, columnConfigList, primaryKeyColumnName));

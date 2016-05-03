@@ -35,7 +35,7 @@ namespace Redisql.Core
 
         internal static string GetRedisKey_TableLock(string tableName, string primaryKeyValue)
         {
-            return string.Format("L:{0}:{1}", tableName, primaryKeyValue);
+            return string.Format("{0}:{1}:{2}", Consts.RedisKey_Prefix_TableLock, tableName, primaryKeyValue);
         }
     }
 }

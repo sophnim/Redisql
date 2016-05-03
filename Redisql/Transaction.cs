@@ -40,15 +40,21 @@ namespace Redisql.Transaction
                 TableLockExit();
         }
 
-        private void TableLockExit()
+        private async void TableLockExit()
         {
+            var tasklist = new List<Task<bool>>();
             var len = this.enterSuccessList.Count;
             for (var i = 0; i < len; i++)
             {
                 var ts = this.enterSuccessList[i].Item1;
                 var primaryKeyValue = this.enterSuccessList[i].Item2;
 
-                this.redis.TableLockExit(ts, primaryKeyValue);
+                tasklist.Add(this.redis.TableLockExit(ts, primaryKeyValue));
+            }
+
+            foreach (var task in tasklist)
+            {
+                await task;
             }
 
             this.enterSuccessList.Clear();
@@ -109,7 +115,7 @@ namespace Redisql.Transaction
 
         public async Task<Dictionary<string, string>> TableSelectRowAsync(List<string> selectColumnNames, string tableName, string primaryKeyColumnValue)
         {
-            return await this.redis.TableSelectRowAsync(selectColumnNames, tableName, primaryKeyColumnValue);
+            return await this.redis.TableSelectRowAsync(selectColumnNames, tableName, primaryKeyColumnValue, useTableLock: false);
         }
 
         public async Task<bool> TableUpdateRowAsync(string tableName, Dictionary<string, string> updateColumnNameValuePairs)
