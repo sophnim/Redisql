@@ -13,5 +13,6 @@ namespace Redisql.Core
         public const string RedisKey_String_TableNameIds = "ST:Table_Name_Ids";
         public const string RedisKey_Prefix_TableLock = "L";
         public const Int32 TableLockExpireSecond = 300;
+        public const Int32 TableLockWaitLongWarningDurationMiliseconds = 3000;
     }
 }

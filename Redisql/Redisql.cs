@@ -10,8 +10,22 @@ using StackExchange.Redis;
 
 namespace Redisql.Core
 {
+    public class RedisqlEventArgs : EventArgs
+    {
+        public RedisqlEventType EventType { get; set; }
+        public string Message { get; set; }
+
+        public RedisqlEventArgs(RedisqlEventType eventType, string msg)
+        {
+            this.EventType = eventType;
+            this.Message = msg;
+        }
+    }
+
     public partial class RedisqlCore
     {
+        public event EventHandler OnEvent;
+
         private ConcurrentDictionary<string, TableSetting> tableSettingDic = new ConcurrentDictionary<string, TableSetting>();
         private ConnectionMultiplexer redis;
 

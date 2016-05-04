@@ -62,7 +62,7 @@ namespace Redisql.Transaction
         }
 
         
-        public async Task<bool> TryBeginTransactionAsync(int maxRetryCount = 100)
+        public async Task<bool> TryBeginTransactionAsync(int maxRetryCount = 1000)
         {
             if (isBegin)
                 return false;
@@ -174,7 +174,7 @@ namespace Redisql.Transaction
             return true;
         }
 
-        public bool TryBeginTransaction(int maxRetryCount = 100)
+        public bool TryBeginTransaction(int maxRetryCount = 1000)
         {
             var task = TryBeginTransactionAsync(maxRetryCount);
             task.Wait();

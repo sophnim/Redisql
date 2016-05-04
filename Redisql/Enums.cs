@@ -6,5 +6,10 @@ using System.Threading.Tasks;
 
 namespace Redisql.Core
 {
-    
+    public enum RedisqlEventType
+    {
+        Info,
+        Warn,       
+        Error
+    }
 }

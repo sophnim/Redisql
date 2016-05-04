@@ -82,10 +82,14 @@ namespace Redisql.Core
                     if (false == ret)
                         await Task.Delay(1);
 
-                    if (stw.ElapsedMilliseconds > 3000)
+                    if (stw.ElapsedMilliseconds > Consts.TableLockWaitLongWarningDurationMiliseconds)
                     {
                         // maybe deadlock?
-                        Console.WriteLine("TableLockEnterAsync takes too long time: Deadlock or Transaction error is suspected! TableName={0} PrimaryKeyValue={1}", tableSetting.tableName, primaryKeyValue);
+                        OnEvent(this, 
+                            new RedisqlEventArgs(RedisqlEventType.Warn, 
+                            string.Format("TableLockEnterAsync takes too long time: TableName={0} PrimaryKeyValue={1}  {2}ms",
+                            tableSetting.tableName, primaryKeyValue, stw.ElapsedMilliseconds)));
+
                         stw.Restart();
                     }
                 } while (false == ret);
