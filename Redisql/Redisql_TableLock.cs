@@ -84,7 +84,7 @@ namespace Redisql.Core
 
                     if (stw.ElapsedMilliseconds > Consts.TableLockWaitLongWarningDurationMiliseconds)
                     {
-                        // maybe deadlock?
+                        // takes too long time to enter table lock: call event handler to notify this situation to user 
                         OnEvent(this, 
                             new RedisqlEventArgs(RedisqlEventType.Warn, 
                             string.Format("TableLockEnterAsync takes too long time: TableName={0} PrimaryKeyValue={1}  {2}ms",
