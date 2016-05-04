@@ -17,11 +17,14 @@ namespace RedisqlTest
 
         public Tests()
         {
-            this.redisql = new RedisqlCore("127.0.0.1", 6379, "");
+            this.redisql = new RedisqlCore("192.168.25.7", 6379, "");
         }
 
         public async void AsyncTest()
         {
+            // For the test, Clear all table lock 
+            await this.redisql.TableLockClearAllAsync();
+
             // Prepare to create table : construct table column config list
             var columnConfigList = new List<ColumnConfig>()
             {
@@ -52,7 +55,7 @@ namespace RedisqlTest
                 { "level", "2" },
                 { "exp", "200" }
             };
-            await this.redisql.TableInsertRowAsync("Account_Table", valueDic);
+            var ret = await this.redisql.TableInsertRowAsync("Account_Table", valueDic);
             
             // insert another row
             valueDic = new Dictionary<string, string>()
@@ -71,32 +74,32 @@ namespace RedisqlTest
             };
             await this.redisql.TableUpdateRowAsync("Account_Table", valueDic);
 
-
             // update row : using transaction
             var tran = new RedisqlTransaction(this.redisql, new List<TransactionTarget>()
             {
-                new TransactionTarget("Account_Table", "bruce"),    
-                new TransactionTarget("Account_Table", "jane")
+                new TransactionTarget("Account_Table", "bruce"),    // specify row to transaction 
+                new TransactionTarget("Account_Table", "jane")      // specify row to transaction  
             });
 
-            if (await tran.TryBeginTransactionAsync())
+            if (await tran.TryBeginTransactionAsync()) 
             {
-                var dic1 = await tran.TableSelectRowAsync(new List<string> { "name", "exp" }, "Account_Table", "bruce");
-                var dic2 = await tran.TableSelectRowAsync(new List<string> { "name", "exp" }, "Account_Table", "jane");
+                // succeeded to begin transaction : table row locked. 
+                var dic1 = await tran.TableSelectRowAsync(new List<string> { "name", "exp" }, "Account_Table", "bruce"); // read value from row
+                var dic2 = await tran.TableSelectRowAsync(new List<string> { "name", "exp" }, "Account_Table", "jane"); // read value from row
 
                 var exp1 = Convert.ToInt32(dic1["exp"]);
                 dic1["exp"] = (exp1 + 10).ToString();
-                await tran.TableUpdateRowAsync("Account_Name", dic1);
+                await tran.TableUpdateRowAsync("Account_Table", dic1); // update row
 
                 var exp2 = Convert.ToInt32(dic1["exp"]);
                 dic2["exp"] = (exp2 + 10).ToString();
-                await tran.TableUpdateRowAsync("Account_Name", dic2);
+                await tran.TableUpdateRowAsync("Account_Table", dic2); // update row
 
-                tran.EndTransaction();
+                tran.EndTransaction(); // transaction end : table row unlocked.
             }
             else
             {
-                // failed to begin transaction
+                // failed to begin transaction : Other transaction is ongoing.
                 Console.WriteLine("Failed to begin transaction");
             }
 

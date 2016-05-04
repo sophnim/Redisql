@@ -257,7 +257,7 @@ namespace Redisql.Core
             finally
             {
                 if (enterTableLock)
-                    TableLockExit(ts, primaryKeyValue);
+                    await TableLockExit(ts, primaryKeyValue);
             }
         }
 
@@ -326,20 +326,27 @@ namespace Redisql.Core
             finally
             {
                 if (enterTableLock)
-                    TableLockExit(ts, primaryKeyValue);
+                    await TableLockExit(ts, primaryKeyValue);
             }
         }
 
         // select one row that matches with primary key column value. 
         // If selectColumnNames is null, select all columns in selected row, or select specified columns only.
-        public async Task<Dictionary<string, string>> TableSelectRowAsync(List<string> selectColumnNames, string tableName, string primaryKeyColumnValue)
+        public async Task<Dictionary<string, string>> TableSelectRowAsync(List<string> selectColumnNames, string tableName, string primaryKeyColumnValue, bool useTableLock = true)
         {
+            TableSetting ts = null;
+            bool enterTableLock = false;
             try
             {
                 var retdic = new Dictionary<string, string>();
-                var ts = await TableGetSettingAsync(tableName);
+                ts = await TableGetSettingAsync(tableName);
                 var key = RedisKey.GetRedisKey_TableRow(ts.tableID, primaryKeyColumnValue);
                 var db = this.redis.GetDatabase();
+
+                if (useTableLock)
+                {
+                    enterTableLock = await TableLockEnterAsync(ts, primaryKeyColumnValue);
+                }
 
                 if (null == selectColumnNames)
                 {
@@ -379,6 +386,11 @@ namespace Redisql.Core
             catch
             {
                 return null;
+            }
+            finally
+            {
+                if (enterTableLock)
+                    await TableLockExit(ts, primaryKeyColumnValue);
             }
         }
 
