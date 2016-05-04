@@ -50,11 +50,11 @@ namespace Redisql.Core
                 int count = 0;
                 while (!await db.StringSetAsync(key, Thread.CurrentThread.ManagedThreadId.ToString(), ts, When.NotExists))
                 {
-                    await Task.Delay(1);
                     if (++count >= retryCount)
                     {
                         return false;
                     }
+                    await Task.Delay(1);
                 }
 
                 return true;

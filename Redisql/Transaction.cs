@@ -37,10 +37,10 @@ namespace Redisql.Transaction
         ~RedisqlTransaction()
         {
             if (isBegin)
-                TableLockExit();
+                TableLockExitAsync().Wait();
         }
 
-        private async void TableLockExit()
+        private async Task<bool> TableLockExitAsync()
         {
             var tasklist = new List<Task<bool>>();
             var len = this.enterSuccessList.Count;
@@ -58,8 +58,73 @@ namespace Redisql.Transaction
             }
 
             this.enterSuccessList.Clear();
+            return true;
         }
 
+        
+        public async Task<bool> TryBeginTransactionAsync(int maxRetryCount = 100)
+        {
+            if (isBegin)
+                return false;
+
+            var len = this.tranTargetList.Count;
+            var tasklist1 = new List<Task<TableSetting>>();
+            var tslist = new List<TableSetting>();
+            for (var i = 0; i < len; i++)
+            {
+                var tranTarget = this.tranTargetList[i];
+                tasklist1.Add(this.redis.TableGetSettingAsync(tranTarget.tableName));
+            }
+
+            for (var i = 0; i < len; i++)
+            {
+                var ts = await tasklist1[i];
+                tslist.Add(ts);
+            }
+
+            var tasklist2 = new List<Task<bool>>();
+            int retryCount = 0;
+            while (true)
+            {
+                tasklist2.Clear();    
+                for (var i = 0; i < len; i++)
+                {
+                    var tranTarget = this.tranTargetList[i];
+                    tasklist2.Add(this.redis.TableLockTryEnterAsync(tslist[i], tranTarget.primaryKeyValue, 0));
+                }
+
+                for (var i = 0; i < len; i++)
+                {
+                    var tranTarget = this.tranTargetList[i];
+                    var ret = await tasklist2[i];
+
+                    if (ret)
+                    {
+                        this.enterSuccessList.Add(new Tuple<TableSetting, string>(tslist[i], tranTarget.primaryKeyValue));
+                    }
+                }
+                
+                if (this.enterSuccessList.Count != tranTargetList.Count)
+                {
+                    await TableLockExitAsync();
+                    if (++retryCount >= maxRetryCount)
+                    {
+                        return false;
+                    }
+                    else
+                    {
+                        await Task.Delay(1);
+                    }
+                }
+                else break;
+            }
+
+            isBegin = true;
+            return true;
+        }
+        
+
+        /*
         public async Task<bool> TryBeginTransactionAsync(int maxRetryCount = 100)
         {
             if (isBegin)
@@ -86,7 +151,7 @@ namespace Redisql.Transaction
 
                 if (this.enterSuccessList.Count != tranTargetList.Count)
                 {
-                    TableLockExit();
+                    await TableLockExitAsync();
                     if (++ retryCount >= maxRetryCount)
                     {
                         return false;
@@ -99,6 +164,15 @@ namespace Redisql.Transaction
             isBegin = true;
             return true;
         }
+        */
+
+        public async Task<bool> EndTransactionAsync()
+        {
+            await TableLockExitAsync();
+            isBegin = false;
+
+            return true;
+        }
 
         public bool TryBeginTransaction(int maxRetryCount = 100)
         {
@@ -109,13 +183,13 @@ namespace Redisql.Transaction
 
         public void EndTransaction()
         {
-            TableLockExit();
+            TableLockExitAsync().Wait();
             isBegin = false;
         }
 
         public void Dispose()
         {
-            TableLockExit();
+            TableLockExitAsync().Wait();
             isBegin = false;
         }
 

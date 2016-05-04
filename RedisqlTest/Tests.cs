@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Diagnostics;
 
@@ -17,11 +18,16 @@ namespace RedisqlTest
 
         public Tests()
         {
+            Console.WriteLine("Create RedisqlCore");
             this.redisql = new RedisqlCore("127.0.0.1", 6379, "");
         }
 
         public async void AsyncTest()
         {
+            ThreadPool.SetMinThreads(50, 100);
+
+            Console.WriteLine("TableLockClearAllAsync");
+
             // For the test, Clear all table lock 
             await this.redisql.TableLockClearAllAsync();
 
@@ -35,8 +41,12 @@ namespace RedisqlTest
                 new ColumnConfig("time", typeof(DateTime), "now", false, true)   // Column 'time', DateTime type, default "now" means current local time("utcnow" will have a current utc time)
             };
 
+            Console.WriteLine("TableCreateAsync");
+
             // Create table : table name: Account_Table, primary key: name
-            await this.redisql.TableCreateAsync("Account_Table", columnConfigList, "name"); 
+            await this.redisql.TableCreateAsync("Account_Table", columnConfigList, "name");
+
+            Console.WriteLine("TableInsertRowAsync");
 
             // prepare to insert table row: column name - value dictionary
             var valueDic = new Dictionary<string, string>()
@@ -46,7 +56,9 @@ namespace RedisqlTest
                 { "exp", "100" }
             };
             // insert row to Account_Table and get row id. row id is auto-increment generated value.
-            var rowid = await this.redisql.TableInsertRowAsync("Account_Table", valueDic); 
+            var rowid = await this.redisql.TableInsertRowAsync("Account_Table", valueDic);
+
+            Console.WriteLine("TableInsertRowAsync");
 
             // insert another row : unspecified column will be filled with default value
             valueDic = new Dictionary<string, string>()
@@ -56,7 +68,9 @@ namespace RedisqlTest
                 { "exp", "200" }
             };
             var ret = await this.redisql.TableInsertRowAsync("Account_Table", valueDic);
-            
+
+            Console.WriteLine("TableInsertRowAsync");
+
             // insert another row
             valueDic = new Dictionary<string, string>()
             {
@@ -66,6 +80,8 @@ namespace RedisqlTest
             };
             await this.redisql.TableInsertRowAsync("Account_Table", valueDic);
 
+            Console.WriteLine("TableUpdateRowAsync");
+
             // update row
             valueDic = new Dictionary<string, string>()
             {
@@ -74,7 +90,9 @@ namespace RedisqlTest
             };
             await this.redisql.TableUpdateRowAsync("Account_Table", valueDic);
 
-            /*
+
+            Console.WriteLine("TryBeginTransactionAsync");
+
             // update row : using transaction
             var tran = new RedisqlTransaction(this.redisql, new List<TransactionTarget>()
             {
@@ -84,6 +102,8 @@ namespace RedisqlTest
 
             if (await tran.TryBeginTransactionAsync()) 
             {
+                Console.WriteLine("Begin transaction success");
+
                 // succeeded to begin transaction : table row locked. 
                 var dic1 = await tran.TableSelectRowAsync(new List<string> { "name", "exp" }, "Account_Table", "bruce"); // read value from row
                 var dic2 = await tran.TableSelectRowAsync(new List<string> { "name", "exp" }, "Account_Table", "jane"); // read value from row
@@ -96,14 +116,15 @@ namespace RedisqlTest
                 dic2["exp"] = (exp2 + 10).ToString();
                 await tran.TableUpdateRowAsync("Account_Table", dic2); // update row
 
-                tran.EndTransaction(); // transaction end : table row unlocked.
+                await tran.EndTransactionAsync(); // transaction end : table row unlocked.
             }
             else
             {
                 // failed to begin transaction : Other transaction is ongoing.
-                Console.WriteLine("Failed to begin transaction");
+                Console.WriteLine("Begin transaction fail");
             }
-            */
+
+            Console.WriteLine("TableSelectRowAsync");
 
             // select a row that have a primary key value "bruce"
             Console.WriteLine("select * from Account_Table where name = bruce");
@@ -133,7 +154,7 @@ namespace RedisqlTest
 
             
             // transaction heavy test
-            for (var i = 0; i <= 10; i++)
+            for (var i = 1; i <= 10; i++)
             {
                 Task.Run(() =>
                 {
@@ -158,6 +179,8 @@ namespace RedisqlTest
                             dic2["exp"] = (exp2 + 10).ToString();
                             tran2.TableUpdateRow("Account_Table", dic2);
 
+                            Console.Write("*");
+
                             tran2.EndTransaction();
                         }
                         else
@@ -165,13 +188,13 @@ namespace RedisqlTest
                             // failed to begin transaction
                             Console.WriteLine("Failed to begin transaction");
                         }
-                        Task.Delay(1).Wait();
+                        //Task.Delay(1).Wait();
                     }
                 });
             }
             
 
-            /*
+            
             for (var i = 0; i <= 10; i++)
             {
                 Task.Run(() =>
@@ -189,10 +212,12 @@ namespace RedisqlTest
                             Console.WriteLine("TableUpdateRow Fail!");
                         }
                         else Console.Write(".");
+
+                        //Task.Delay(1).Wait();
                     }
                 });
             }
-            */
+            
 
             Console.WriteLine("\n\nEnd of Test");
         }
