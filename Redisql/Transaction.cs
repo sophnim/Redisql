@@ -137,7 +137,7 @@ namespace Redisql.Transaction
 
         public Dictionary<string, string> TableSelectRow(List<string> selectColumnNames, string tableName, string primaryKeyColumnValue)
         {
-            return this.redis.TableSelectRow(selectColumnNames, tableName, primaryKeyColumnValue);
+            return this.redis.TableSelectRow(selectColumnNames, tableName, primaryKeyColumnValue, useTableLock: false);
         }
 
         public bool TableUpdateRow(string tableName, Dictionary<string, string> updateColumnNameValuePairs)

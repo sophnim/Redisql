@@ -42,9 +42,9 @@ namespace Redisql.Core
             return WaitTaskAndReturnTaskResult<bool>(TableDeleteRowAsync(tableName, primaryKeyValue, useTableLock));
         }
 
-        public Dictionary<string, string> TableSelectRow(List<string> selectColumnNames, string tableName, string primaryKeyColumnValue)
+        public Dictionary<string, string> TableSelectRow(List<string> selectColumnNames, string tableName, string primaryKeyColumnValue, bool useTableLock = true)
         {
-            return WaitTaskAndReturnTaskResult<Dictionary<string, string>>(TableSelectRowAsync(selectColumnNames, tableName, primaryKeyColumnValue));
+            return WaitTaskAndReturnTaskResult<Dictionary<string, string>>(TableSelectRowAsync(selectColumnNames, tableName, primaryKeyColumnValue, useTableLock));
         }
 
         public List<Dictionary<string, string>> TableSelectRow(List<string> selectColumnNames, string tableName, string compareMatchIndexColumnName, string compareColumnValue)

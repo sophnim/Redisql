@@ -17,7 +17,7 @@ namespace RedisqlTest
 
         public Tests()
         {
-            this.redisql = new RedisqlCore("192.168.25.7", 6379, "");
+            this.redisql = new RedisqlCore("127.0.0.1", 6379, "");
         }
 
         public async void AsyncTest()
@@ -74,6 +74,7 @@ namespace RedisqlTest
             };
             await this.redisql.TableUpdateRowAsync("Account_Table", valueDic);
 
+            /*
             // update row : using transaction
             var tran = new RedisqlTransaction(this.redisql, new List<TransactionTarget>()
             {
@@ -102,6 +103,7 @@ namespace RedisqlTest
                 // failed to begin transaction : Other transaction is ongoing.
                 Console.WriteLine("Failed to begin transaction");
             }
+            */
 
             // select a row that have a primary key value "bruce"
             Console.WriteLine("select * from Account_Table where name = bruce");
@@ -129,7 +131,7 @@ namespace RedisqlTest
             rows = await redisql.TableSelectRowAsync(null, "Account_Table", "exp", lowValue:"250", highValue:"300");
             RedisqlHelper.PrintRows(rows);
 
-
+            
             // transaction heavy test
             for (var i = 0; i <= 10; i++)
             {
@@ -145,16 +147,16 @@ namespace RedisqlTest
 
                         if (tran2.TryBeginTransaction())
                         {
-                            var dic1 = tran.TableSelectRow(new List<string> { "name", "exp" }, "Account_Table", "bruce");
-                            var dic2 = tran.TableSelectRow(new List<string> { "name", "exp" }, "Account_Table", "jane");
+                            var dic1 = tran2.TableSelectRow(new List<string> { "name", "exp" }, "Account_Table", "bruce");
+                            var dic2 = tran2.TableSelectRow(new List<string> { "name", "exp" }, "Account_Table", "jane");
 
                             var exp1 = Convert.ToInt32(dic1["exp"]);
                             dic1["exp"] = (exp1 + 10).ToString();
-                            tran.TableUpdateRow("Account_Table", dic1);
+                            tran2.TableUpdateRow("Account_Table", dic1);
 
                             var exp2 = Convert.ToInt32(dic1["exp"]);
                             dic2["exp"] = (exp2 + 10).ToString();
-                            tran.TableUpdateRow("Account_Table", dic2);
+                            tran2.TableUpdateRow("Account_Table", dic2);
 
                             tran2.EndTransaction();
                         }
@@ -167,26 +169,30 @@ namespace RedisqlTest
                     }
                 });
             }
+            
 
-
-
-            Task.Run(() =>
+            /*
+            for (var i = 0; i <= 10; i++)
             {
-                while (true)
+                Task.Run(() =>
                 {
-                    valueDic = new Dictionary<string, string>()
+                    while (true)
                     {
+                        valueDic = new Dictionary<string, string>()
+                        {
                         { "name", "bruce" },
                         { "exp", "250" }
-                    };
+                        };
 
-                    if (!this.redisql.TableUpdateRow("Account_Table", valueDic))
-                    {
-                        Console.WriteLine("TableUpdateRow Fail!");
+                        if (!this.redisql.TableUpdateRow("Account_Table", valueDic))
+                        {
+                            Console.WriteLine("TableUpdateRow Fail!");
+                        }
+                        else Console.Write(".");
                     }
-                    else Console.Write(".");
-                }
-            });
+                });
+            }
+            */
 
             Console.WriteLine("\n\nEnd of Test");
         }
