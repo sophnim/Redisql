@@ -47,7 +47,7 @@ namespace Redisql.Core
             {
                 var db = this.redis.GetDatabase();
                 var key = RedisKey.GetRedisKey_TableLock(tableSetting.tableName, primaryKeyValue);
-                var ts = new TimeSpan(0, 0, 300);
+                var ts = new TimeSpan(0, 0, Consts.TableLockExpireSecond);
 
                 var stw = Stopwatch.StartNew();
                 bool ret;
@@ -60,7 +60,7 @@ namespace Redisql.Core
                     if (stw.ElapsedMilliseconds > 3000)
                     {
                         // maybe deadlock?
-                        Console.WriteLine("TableLockEnterAsync takes too long time: Deadlock or Transaction error is suspected!");
+                        Console.WriteLine("TableLockEnterAsync takes too long time: Deadlock or Transaction error is suspected! TableName={0} PrimaryKeyValue={1}", tableSetting.tableName, primaryKeyValue);
                         stw.Restart();
                     }
                 } while (false == ret);

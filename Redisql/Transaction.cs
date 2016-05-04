@@ -20,21 +20,21 @@ namespace Redisql.Transaction
         }
     }
 
-    public class Transaction : IDisposable
+    public class RedisqlTransaction : IDisposable
     {
         bool isBegin = false;
         RedisqlCore redis;
         List<TransactionTarget> tranTargetList;
         List<Tuple<TableSetting, string>> enterSuccessList;
 
-        public Transaction(RedisqlCore redis, List<TransactionTarget> tranTargetList)
+        public RedisqlTransaction(RedisqlCore redis, List<TransactionTarget> tranTargetList)
         {
             this.redis = redis;
             this.tranTargetList = tranTargetList;
             this.enterSuccessList = new List<Tuple<TableSetting, string>>();
         }
 
-        ~Transaction()
+        ~RedisqlTransaction()
         {
             if (isBegin)
                 TableLockExit();
@@ -94,6 +94,13 @@ namespace Redisql.Transaction
             return true;
         }
 
+        public bool TryBeginTransaction(int maxRetryCount = 100)
+        {
+            var task = TryBeginTransactionAsync(maxRetryCount);
+            task.Wait();
+            return task.Result;
+        }
+
         public void EndTransaction()
         {
             TableLockExit();
@@ -120,6 +127,21 @@ namespace Redisql.Transaction
         public async Task<bool> TableDeleteRowAsync(string tableName, string primaryKeyValue, bool useTableLock = true)
         {
             return await this.redis.TableDeleteRowAsync(tableName, primaryKeyValue, useTableLock: false);
+        }
+
+        public Dictionary<string, string> TableSelectRow(List<string> selectColumnNames, string tableName, string primaryKeyColumnValue)
+        {
+            return this.redis.TableSelectRow(selectColumnNames, tableName, primaryKeyColumnValue);
+        }
+
+        public bool TableUpdateRow(string tableName, Dictionary<string, string> updateColumnNameValuePairs)
+        {
+            return this.redis.TableUpdateRow(tableName, updateColumnNameValuePairs, useTableLock:false);
+        }
+
+        public bool TableDeleteRow(string tableName, string primaryKeyValue)
+        {
+            return this.redis.TableDeleteRow(tableName, primaryKeyValue, useTableLock:false);
         }
     }
 }

@@ -73,7 +73,7 @@ namespace RedisqlTest
 
 
             // update row : using transaction
-            var tran = new Transaction(this.redisql, new List<TransactionTarget>()
+            var tran = new RedisqlTransaction(this.redisql, new List<TransactionTarget>()
             {
                 new TransactionTarget("Account_Table", "bruce"),    
                 new TransactionTarget("Account_Table", "jane")
@@ -99,7 +99,6 @@ namespace RedisqlTest
                 // failed to begin transaction
                 Console.WriteLine("Failed to begin transaction");
             }
-            
 
             // select a row that have a primary key value "bruce"
             Console.WriteLine("select * from Account_Table where name = bruce");
@@ -117,16 +116,75 @@ namespace RedisqlTest
 
             // select rows that matches value with match index column
             Console.WriteLine("select * from Account_Table where level == 1");
-            var rows = await redisql.TableSelectRowAsync(null, "Account_Table", "level", "1");
+            var rows = await redisql.TableSelectRowAsync(null, "Account_Table", "level", compareColumnValue:"1");
             RedisqlHelper.PrintRows(rows);
 
             Console.WriteLine("");
 
             // select rows that has a proper range column value
             Console.WriteLine("select * from Account_Table where 250 <= exp <= 300");
-            rows = await redisql.TableSelectRowAsync(null, "Account_Table", "exp", "250", "300");
+            rows = await redisql.TableSelectRowAsync(null, "Account_Table", "exp", lowValue:"250", highValue:"300");
             RedisqlHelper.PrintRows(rows);
-            
+
+
+            // transaction heavy test
+            for (var i = 0; i <= 10; i++)
+            {
+                Task.Run(() =>
+                {
+                    while (true)
+                    {
+                        var tran2 = new RedisqlTransaction(this.redisql, new List<TransactionTarget>()
+                        {
+                        new TransactionTarget("Account_Table", "bruce"),
+                        new TransactionTarget("Account_Table", "jane")
+                        });
+
+                        if (tran2.TryBeginTransaction())
+                        {
+                            var dic1 = tran.TableSelectRow(new List<string> { "name", "exp" }, "Account_Table", "bruce");
+                            var dic2 = tran.TableSelectRow(new List<string> { "name", "exp" }, "Account_Table", "jane");
+
+                            var exp1 = Convert.ToInt32(dic1["exp"]);
+                            dic1["exp"] = (exp1 + 10).ToString();
+                            tran.TableUpdateRow("Account_Table", dic1);
+
+                            var exp2 = Convert.ToInt32(dic1["exp"]);
+                            dic2["exp"] = (exp2 + 10).ToString();
+                            tran.TableUpdateRow("Account_Table", dic2);
+
+                            tran2.EndTransaction();
+                        }
+                        else
+                        {
+                            // failed to begin transaction
+                            Console.WriteLine("Failed to begin transaction");
+                        }
+                        Task.Delay(1).Wait();
+                    }
+                });
+            }
+
+
+
+            Task.Run(() =>
+            {
+                while (true)
+                {
+                    valueDic = new Dictionary<string, string>()
+                    {
+                        { "name", "bruce" },
+                        { "exp", "250" }
+                    };
+
+                    if (!this.redisql.TableUpdateRow("Account_Table", valueDic))
+                    {
+                        Console.WriteLine("TableUpdateRow Fail!");
+                    }
+                    else Console.Write(".");
+                }
+            });
+
             Console.WriteLine("\n\nEnd of Test");
         }
 
@@ -160,8 +218,6 @@ namespace RedisqlTest
             foreach (var task in tasklist) task.Wait();
 
             Console.WriteLine("Total {0}ms  {1} per 1ms", stw.ElapsedMilliseconds, testCount / stw.ElapsedMilliseconds);
-
-            GC.Collect();
 
             
             // select all rows

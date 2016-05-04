@@ -27,14 +27,14 @@ namespace Redisql.Core
             return WaitTaskAndReturnTaskResult<Int64>(TableInsertRowAsync(tableName, insertRowColumnNameValuePairs));
         }
 
-        public bool TableUpdateRow(string tableName, Dictionary<string, string> updateColumnNameValuePairs)
+        public bool TableUpdateRow(string tableName, Dictionary<string, string> updateColumnNameValuePairs, bool useTableLock = true)
         {
-            return WaitTaskAndReturnTaskResult<bool>(TableUpdateRowAsync(tableName, updateColumnNameValuePairs));
+            return WaitTaskAndReturnTaskResult<bool>(TableUpdateRowAsync(tableName, updateColumnNameValuePairs, useTableLock));
         }
 
-        public bool TableDeleteRow(string tableName, string primaryKeyValue)
+        public bool TableDeleteRow(string tableName, string primaryKeyValue, bool useTableLock = true)
         {
-            return WaitTaskAndReturnTaskResult<bool>(TableDeleteRowAsync(tableName, primaryKeyValue));
+            return WaitTaskAndReturnTaskResult<bool>(TableDeleteRowAsync(tableName, primaryKeyValue, useTableLock));
         }
 
         public Dictionary<string, string> TableSelectRow(List<string> selectColumnNames, string tableName, string primaryKeyColumnValue)
